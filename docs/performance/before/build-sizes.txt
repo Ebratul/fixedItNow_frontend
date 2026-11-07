@@ -1,0 +1,130 @@
+FixedItNow frontend: production bundle sizes (BEFORE optimizations)
+Generated: 2026-11-07T19:00:25+06:00
+Build: next 16.4.3 (Turbopack), `npm run build:perf` (= next build with frontend/.env.perf), no code changes
+Sizes: raw = minified bytes on disk; gzip = gzip -9 of each file (what the browser downloads).
+First Load JS = every JS chunk the route needs before it is interactive (from .next/diagnostics/route-bundle-stats.json).
+
+Shared by all 60 routes: 9 chunks, 530.6 kB raw / 162.6 kB gzip
+
+== 1. First Load JS per route (largest first) ==
+route                                              raw        gzip chunks
+/admin/moderation                             708.2 kB    217.2 kB     12
+/admin/payments                               699.8 kB    215.5 kB     12
+/admin/ai                                     699.3 kB    214.8 kB     12
+/admin/users/[id]                             695.8 kB    214.3 kB     12
+/admin/announcements                          692.9 kB    213.2 kB     12
+/admin/disputes/[id]                          692.4 kB    212.8 kB     12
+/admin/payments/[reference]                   690.1 kB    212.2 kB     12
+/admin/support/[id]                           688.5 kB    211.9 kB     12
+/admin/audit                                  687.7 kB    211.9 kB     12
+/admin/finance                                686.5 kB    210.9 kB     12
+/admin/bookings                               686.2 kB    211.3 kB     12
+/admin/workers/[id]                           685.3 kB    210.8 kB     12
+/admin/settings                               685.3 kB    210.9 kB     12
+/admin/bookings/[id]                          683.7 kB    210.0 kB     12
+/admin/disputes                               682.1 kB    209.9 kB     12
+/admin/support                                681.7 kB    210.0 kB     12
+/admin/workers                                679.1 kB    209.1 kB     12
+/admin/users                                  678.5 kB    209.0 kB     12
+/admin/roles                                  678.1 kB    208.3 kB     12
+/admin/categories                             677.7 kB    208.3 kB     12
+/admin                                        677.7 kB    208.1 kB     12
+/onboarding/worker                            676.3 kB    206.5 kB     11
+/admin/system                                 675.7 kB    207.7 kB     12
+/login                                        658.2 kB    201.3 kB     11
+/register                                     652.0 kB    199.2 kB     11
+/verify-email                                 646.8 kB    197.6 kB     11
+/onboarding/customer                          643.7 kB    196.2 kB     11
+/reset-password                               641.4 kB    195.5 kB     11
+/forgot-password                              639.9 kB    194.9 kB     11
+/bookings/[id]                                607.3 kB    187.8 kB     11
+/assistant                                    563.5 kB    174.3 kB     10
+/payments/[reference]                         558.8 kB    172.4 kB     10
+/community/[id]                               557.8 kB    172.0 kB     10
+/account/support/new                          556.5 kB    171.9 kB     10
+/community/proposals                          556.2 kB    171.9 kB     10
+/workers/[slug]/book                          553.4 kB    171.0 kB     10
+/workers/[slug]                               551.3 kB    170.4 kB     10
+/bookings/[id]/pay                            551.0 kB    169.7 kB     10
+/community                                    550.6 kB    169.9 kB     10
+/account/support                              549.9 kB    169.7 kB     10
+/account/availability                         548.3 kB    169.2 kB     10
+/payments/demo/[reference]                    547.9 kB    168.7 kB     10
+/account                                      547.7 kB    168.1 kB     10
+/account/support/[id]                         547.4 kB    168.9 kB     10
+/account/favorites                            547.3 kB    168.8 kB     10
+/payments                                     546.0 kB    168.1 kB     10
+/account/notifications                        543.8 kB    167.6 kB     10
+/bookings                                     543.5 kB    167.5 kB     10
+/                                             539.6 kB    166.6 kB     10
+/services                                     539.0 kB    166.0 kB     10
+/onboarding                                   538.7 kB    165.6 kB     10
+/demo/[role]                                  536.9 kB    165.3 kB     10
+/services/[slug]                              534.5 kB    164.5 kB     10
+/workers                                      534.5 kB    164.5 kB     10
+/_not-found                                   530.6 kB    162.6 kB      9
+/about                                        530.6 kB    162.6 kB      9
+/become-a-worker                              530.6 kB    162.6 kB      9
+/contact                                      530.6 kB    162.6 kB      9
+/help                                         530.6 kB    162.6 kB      9
+/how-it-works                                 530.6 kB    162.6 kB      9
+(cross-check: raw totals equal Next's firstLoadUncompressedJsBytes for 60/60 routes)
+
+== 2. Ten largest JS chunks ==
+chunk                              raw        gzip  routes  main contents (share of the chunk)
+2ki52vdnbo2ft.js              224.5 kB     70.1 kB     all  react-dom (bundled in next) 89%, next (framework runtime) 10%, scheduler (bundled in next) 2%
+3l_qmp-61z4yc.js              164.8 kB     45.3 kB     all  next (framework runtime) 83%, react-server-dom-turbopack (bundled in next) 14%, react-dom (bundled in next) 2%
+0cz1d0mv5g_q7.js              110.0 kB     38.5 kB    lazy  next (framework runtime) 100%
+04s4mq42llu5y.js              102.8 kB     29.3 kB      29  zod 100%
+0ri686kyrnlde.js               52.2 kB     16.3 kB       1  app code: src/components/bookings 87%, app code: src/components/reviews 13%
+3cn_b3700_h7a.js               51.7 kB     16.9 kB       1  app code: src/components/admin 75%, app code: src/components/ui 13%, app code: src/lib 7%
+0fyvhj7uxqg14.js               47.7 kB     17.1 kB     all  lucide-react 26%, app code: src/components/layout 25%, next (framework runtime) 16%
+01jqj4mmwutd7.js               43.3 kB     15.2 kB       1  app code: src/components/admin 76%, app code: src/components/ui 12%, app code: src/lib 6%
+0ag-7jgvxfk9o.js               42.8 kB     14.5 kB       1  app code: src/components/admin 77%, app code: src/components/ui 15%, app code: src/lib 6%
+2u45743j9sus_.js               42.8 kB     14.5 kB       1  app code: src/components/onboarding 53%, app code: src/components/ui 24%, app code: src/lib 13%
+
+== 3. Client JS by dependency ==
+Source: `next analyze export --snapshot before`. Sizes are minified module bytes.
+  unique    = each module counted once (what the dependency itself weighs)
+  gzip      = analyzer's per-module gzip estimate (modules compressed one by one, so it overstates whole-file gzip)
+  in chunks = summed over every chunk that contains the module (> unique when it is duplicated across route chunks)
+  routes    = routes whose client bundle contains it (60 = every route)
+package / source                                    unique        gzip   in chunks  routes
+next (framework runtime)                          312.8 kB    127.5 kB    312.8 kB      60
+app code: src/components/admin                    301.2 kB    118.4 kB    508.7 kB      22
+react-dom (bundled in next)                       202.6 kB     63.9 kB    202.6 kB      60
+zod                                               102.0 kB     32.7 kB    102.0 kB      29
+app code: src/components/bookings                  69.8 kB     27.4 kB     74.3 kB       5
+lucide-react                                       30.4 kB     18.9 kB     51.4 kB      60
+app code: src/components/payments                  28.8 kB     11.4 kB     30.1 kB       5
+app code: src/components/onboarding                27.8 kB     10.5 kB     27.8 kB       3
+app code: src/components/community                 26.9 kB     10.8 kB     64.7 kB      17
+app code: src/components/auth                      26.4 kB     12.9 kB     44.7 kB       6
+app code: src/lib                                  25.9 kB     11.9 kB    161.8 kB      60
+react-server-dom-turbopack (bundled in next)       23.6 kB      7.7 kB     23.6 kB      60
+app code: src/components/ui                        23.1 kB     12.6 kB    253.3 kB      60
+app code: src/components/account                   16.7 kB      5.8 kB     42.8 kB      20
+better-auth                                        13.6 kB      6.6 kB     13.6 kB      60
+app code: src/components/support                   13.2 kB      5.8 kB     17.1 kB       3
+app code: src/components/layout                    11.8 kB      5.2 kB     11.8 kB      60
+app code: src/components/reviews                   11.3 kB      4.8 kB     11.3 kB       2
+other: [turbopack]                                 11.0 kB      5.0 kB     11.0 kB      60
+@better-fetch/fetch                                11.0 kB      4.0 kB     11.0 kB      60
+app code: src/components/assistant                 10.3 kB      3.7 kB     10.3 kB       1
+app code: src/components/notifications              8.5 kB      4.1 kB      8.5 kB      60
+react (bundled in next)                             8.2 kB      3.4 kB      8.2 kB      60
+app code: src/components/professional               5.6 kB      2.5 kB     15.6 kB       6
+@better-auth/core                                   4.0 kB      1.9 kB      4.0 kB      60
+TOTAL client JS                                  1344.0 kB    528.3 kB   2040.6 kB
+
+Third-party npm packages only (largest first):
+  next (framework runtime)                        312.8 kB unique, on 60 routes
+  react-dom (bundled in next)                     202.6 kB unique, on 60 routes
+  zod                                             102.0 kB unique, on 29 routes
+  lucide-react                                     30.4 kB unique, on 60 routes
+  react-server-dom-turbopack (bundled in next)     23.6 kB unique, on 60 routes
+  better-auth                                      13.6 kB unique, on 60 routes
+  @better-fetch/fetch                              11.0 kB unique, on 60 routes
+  react (bundled in next)                           8.2 kB unique, on 60 routes
+
+Chunk mapping: 65/66 build chunks matched to analyzer chunks by size (same source, different hashes).

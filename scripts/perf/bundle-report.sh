@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Frontend bundle report, produced the same way every time (document/perf-reports/before/README.md).
+# Frontend bundle report, produced the same way every time (docs/performance/before/README.md).
 #
 #   cd frontend
-#   bash scripts/perf/bundle-report.sh after                 # -> ../document/perf-reports/after/
+#   bash scripts/perf/bundle-report.sh after                 # -> docs/performance/after/
 #   bash scripts/perf/bundle-report.sh after /some/other/dir # custom output folder
 #   FORCE=1 bash scripts/perf/bundle-report.sh after         # overwrite an existing report
 #
@@ -16,7 +16,7 @@ label="${1:?usage: bash scripts/perf/bundle-report.sh <label, e.g. after> [outpu
 
 cd "$(dirname "$0")/../.."               # frontend/
 front="$PWD"
-out="${2:-$front/../document/perf-reports/$label}"
+out="${2:-$front/docs/performance/$label}"
 
 if [[ -f "$out/build-sizes.txt" && "${FORCE:-}" != "1" ]]; then
   echo "$out already has a report. Use another label, or FORCE=1 to overwrite it."

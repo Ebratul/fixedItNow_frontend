@@ -54,3 +54,7 @@ next-env.d.ts
 .idea/
 .vscode/
 !.env.perf.example
+
+# perf reports: the bundle analyzer output (~31 MB per report) is regenerated, not committed
+# (docs/performance/before/README.md, "Rebuilding bundle-analyzer/")
+/docs/performance/*/bundle-analyzer/
