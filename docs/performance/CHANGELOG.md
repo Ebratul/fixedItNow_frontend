@@ -26,6 +26,28 @@ Entry template:
 
 ---
 
+## 2026-11-07: "All (1000+)" page size on /admin/users (tooling, sets up the next optimization)
+
+- **Type:** tooling. This is a stress setting for measurement, not an optimization; no virtualization yet.
+- **What:** /admin/users has a "Rows per page" menu: 20 (default), 50, or "All (1000+)". All asks for
+  `pageSize=2000`, which is the backend's only accepted size above 50. With the perf seed it shows all 1,507 users
+  in one table.
+- **Files:**
+  - frontend `src/components/admin/people/users-list.tsx` (`PAGE_SIZES`, the `user-page-size` select);
+  - backend `src/admin/users/users.controller.ts` (`USERS_ALL_PAGE_SIZE`; `pageSize` must be 1–50 or 2000);
+  - backend `test/admin-users.e2e-spec.ts`.
+- **Why:** to get a realistic large-table baseline (1,500 rendered rows) to measure the planned table optimizations
+  against (B3 in `before/bottlenecks.md`, and virtualization later).
+- **Requirement:** SRS 5.3-a, 5.3-c, Phase 10. The query stays bounded at 2,000 rows; any other size stays ≤ 50.
+- **Result (measured on :3101 dev and :4100):**
+  - `GET /admin/users?pageSize=2000`: 1,507 users, 446 kB JSON, about 42 ms.
+  - Headless Chrome: switching to All rendered 1,507 rows in 485 ms, including the fetch.
+- **Verified by:**
+  - backend `tsc`, unit tests, and `test/admin-users.e2e-spec.ts` (10/10: 2000 accepted; 51, 500 and 2001
+    rejected);
+  - frontend `tsc` and eslint;
+  - a browser check on :3101.
+
 ## 2026-11-07: Reports moved into the frontend repository (tooling, no optimization)
 
 - **Type:** tooling. No application code changed.

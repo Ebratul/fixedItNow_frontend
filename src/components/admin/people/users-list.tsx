@@ -14,7 +14,17 @@ import { formatDate } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
 import type { UserList, UserRow } from "./types";
 
-const PAGE_SIZE = 20;
+/**
+ * Rows per page. "All (1000+)" asks for one page of 2,000, which is the backend's only allowed size above 50
+ * (USERS_ALL_PAGE_SIZE in backend users.controller.ts). It shows the whole performance data set (about 1,500
+ * users) at once, as the un-virtualized baseline for table rendering.
+ */
+const PAGE_SIZES = [
+  { value: "20", label: "20 per page" },
+  { value: "50", label: "50 per page" },
+  { value: "2000", label: "All (1000+)" },
+] as const;
+const DEFAULT_PAGE_SIZE = "20";
 
 export const VERIFICATION_LABELS: Record<string, string> = {
   NOT_SUBMITTED: "not submitted",
@@ -67,9 +77,10 @@ export function UsersList() {
   const [role, setRole] = useState("");
   const [status, setStatus] = useState("");
   const [kind, setKind] = useState("");
+  const [pageSize, setPageSize] = useState<string>(DEFAULT_PAGE_SIZE);
   const [page, setPage] = useState(1);
   const search = useDebounced(q.trim());
-  const path = `/admin/users${buildQuery({ q: search, role, status, kind, page, pageSize: PAGE_SIZE })}`;
+  const path = `/admin/users${buildQuery({ q: search, role, status, kind, page, pageSize: Number(pageSize) })}`;
   const { state, reload, stale } = useApi<UserList>(path);
   const filtered = Boolean(search || role || status || kind);
 
@@ -82,6 +93,7 @@ export function UsersList() {
         <SelectInput id="user-role" label="Account role" placeholder="All roles" value={role} onChange={(e) => { setRole(e.target.value); setPage(1); }} options={[{ value: "USER", label: "Regular users" }, { value: "ADMIN", label: "Administrators" }]} />
         <SelectInput id="user-status" label="Status" placeholder="Any status" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} options={[{ value: "active", label: "Active" }, { value: "suspended", label: "Suspended" }]} />
         <SelectInput id="user-kind" label="Profile" placeholder="Any profile" value={kind} onChange={(e) => { setKind(e.target.value); setPage(1); }} options={[{ value: "customer", label: "Customers" }, { value: "worker", label: "Workers" }]} />
+        <SelectInput id="user-page-size" label="Rows per page" placeholder={null} value={pageSize} onChange={(e) => { setPageSize(e.target.value); setPage(1); }} options={PAGE_SIZES} />
       </form>
 
       <ApiView state={state} reload={reload} skeleton={<Skeleton className="h-64" />}>
