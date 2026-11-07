@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Generated bundle-analyzer output of the performance reports (git-ignored, minified).
+    "docs/performance/*/bundle-analyzer/**",
   ]),
 ]);
 
