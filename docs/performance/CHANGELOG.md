@@ -26,6 +26,48 @@ Entry template:
 
 ---
 
+## 2026-11-07: Scroll-linked UI of the virtualized lists: rAF throttle, scroll position in a ref (optimization)
+
+- **Type:** optimization.
+- **What** (all in the shared `useVirtualRows` hook, so it applies to both /admin/users and /admin/audit):
+  - **Scroll-linked UI:**
+    - a soft shadow under the sticky users-table header once rows scroll under it;
+    - a "Rows 73–82 of 1,507" / "Entries 70–79 of 2,003" line under each list.
+  - **Throttling:**
+    - the scroll position lives in a ref (`scrollTopRef`), never in state;
+    - a scroll event only requests one `requestAnimationFrame`;
+    - that frame reads the position once, and sets state only when `scrolled`, `first` or `last` really changes.
+  - **`useFlushSync: false` for TanStack Virtual:** by default it forced a synchronous React commit on every scroll
+    event. Now React batches the updates of one frame.
+  - **Keyboard safety:** without the synchronous commit, a fast Tab could move focus past the rendered rows, because
+    the scroll event comes a frame later. So the keyboard-focused (`:focus-visible`) row is kept in state, and the
+    window always reaches `overscan` rows past it. Mouse focus is ignored, so a click never shifts the row under the
+    pointer.
+- **Files:**
+  - `src/components/admin/kit/use-virtual-rows.ts`;
+  - `src/components/admin/kit/virtual-data-table.tsx`;
+  - `src/components/admin/people/audit-view.tsx`;
+  - `scripts/perf/scroll-sweep.mjs` (new).
+- **Why:** scroll-driven UI must not re-render on every scroll event, and the virtualizer itself committed once
+  per scroll event.
+- **Requirement:** SRS 5.3-c, Phase 10.
+- **Result** (`node scripts/perf/scroll-sweep.mjs <page> <select> <All value>`; 150 scroll events of 40 px, 4 per
+  frame; 3 runs; :3101 dev):
+
+  | | Users, before | Users, after | Audit, before | Audit, after |
+  | --- | --- | --- | --- | --- |
+  | React commits during the sweep | 142 | **31** | 114 | **31** |
+  | Render time, all commits | 335–343 ms | **174–180 ms** | 125–130 ms | **76–84 ms** |
+  | Slowest commit | 11–11.7 ms | 13.1–14.8 ms | 2.6–4.3 ms | 3.0–5.3 ms |
+
+  "After" includes the new header shadow and range line. The slowest single commit is slightly larger, because
+  one commit now covers up to 4 scroll events.
+- **Verified by:**
+  - `tsc`, eslint (0 warnings), vitest 431/431;
+  - users browser checks 24/24, run twice; audit checks all passing;
+  - a Tab trace after scrolling to the bottom and back: focus stays in the table (row 24 after 22 Tabs);
+  - the header shadow appears once scrolled.
+
 ## 2026-11-07: Finance what-if commission rate: state colocation + debounce (optimization)
 
 - **Type:** optimization.

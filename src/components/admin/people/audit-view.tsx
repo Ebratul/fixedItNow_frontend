@@ -162,7 +162,7 @@ function AuditList({ entries, stale }: { entries: AuditEntry[]; stale: boolean }
 }
 
 function VirtualAuditList({ entries, stale, openIds, onToggle }: { entries: AuditEntry[]; stale: boolean; openIds: ReadonlySet<string>; onToggle: (id: string, open: boolean) => void }) {
-  const { scrollRef, items, before, after, measureElement } = useVirtualRows({
+  const { scrollRef, view, onFocus, items, before, after, measureElement } = useVirtualRows({
     count: entries.length,
     getKey: (index) => entries[index]!.id,
     overscan: OVERSCAN,
@@ -170,8 +170,10 @@ function VirtualAuditList({ entries, stale, openIds, onToggle }: { entries: Audi
     resetOn: entries,
   });
   return (
+    <div className="space-y-2">
     <div
       ref={scrollRef}
+      onFocus={onFocus}
       role="region"
       aria-label={`Audit entries, ${entries.length} (scrollable)`}
       tabIndex={0}
@@ -190,6 +192,10 @@ function VirtualAuditList({ entries, stale, openIds, onToggle }: { entries: Audi
         })}
         {after > 0 && <li aria-hidden="true" style={{ height: after }} />}
       </ul>
+    </div>
+    <p className="text-xs text-ink-subtle tabular-nums">
+      Entries {(view.first + 1).toLocaleString("en-BD")}–{(view.last + 1).toLocaleString("en-BD")} of {entries.length.toLocaleString("en-BD")}
+    </p>
     </div>
   );
 }

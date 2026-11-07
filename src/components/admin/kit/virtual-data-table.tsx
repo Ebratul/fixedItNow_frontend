@@ -76,7 +76,7 @@ export function VirtualDataTable<T>({
     return () => observer.disconnect();
   }, []);
 
-  const { scrollRef, items, before, after, measureElement } = useVirtualRows({
+  const { scrollRef, view, onFocus, items, before, after, measureElement } = useVirtualRows({
     count: rows.length,
     // Keeps a row's measured height attached to that row when the result changes.
     getKey: (index) => rowKey(rows[index]!),
@@ -93,8 +93,10 @@ export function VirtualDataTable<T>({
   );
 
   return (
+    <div className="space-y-2">
     <div
       ref={scrollRef}
+      onFocus={onFocus}
       role="region"
       aria-label={`${caption}, ${rows.length} rows (scrollable)`}
       tabIndex={0}
@@ -113,7 +115,9 @@ export function VirtualDataTable<T>({
                 scope="col"
                 style={c.width ? { width: c.width } : undefined}
                 className={cn(
-                  "sticky top-0 z-10 bg-surface px-4 py-3 font-bold shadow-[inset_0_-1px_0_var(--color-line)]",
+                  "sticky top-0 z-10 bg-surface px-4 py-3 font-bold",
+                  // The header's bottom line, plus a soft shadow once rows scroll beneath it (scroll-linked, rAF-throttled).
+                  view.scrolled ? "shadow-[inset_0_-1px_0_var(--color-line),0_6px_8px_-6px_rgba(0,0,0,0.18)]" : "shadow-[inset_0_-1px_0_var(--color-line)]",
                   c.align === "right" && "text-right",
                   hideCell(c.hideBelow),
                   c.className,
@@ -134,6 +138,12 @@ export function VirtualDataTable<T>({
           {after > 0 && spacer(after)}
         </tbody>
       </table>
+    </div>
+    {rows.length > 0 && (
+      <p className="text-xs text-ink-subtle tabular-nums">
+        Rows {(view.first + 1).toLocaleString("en-BD")}–{(view.last + 1).toLocaleString("en-BD")} of {rows.length.toLocaleString("en-BD")}
+      </p>
+    )}
     </div>
   );
 }
