@@ -26,6 +26,28 @@ Entry template:
 
 ---
 
+## 2026-11-07: "After" reports, comparison and PERFORMANCE.md draft (measurement)
+
+- **Type:** measurement and documentation. No code changed.
+- **What:**
+  - `bash scripts/perf/bundle-report.sh after` was run on the final code; the output is `after/build-sizes.txt` etc.
+    `bundle-analyzer/` is git-ignored.
+  - Lighthouse 13.5.0 Desktop, signed in, on /admin, /admin/users and /admin/finance:
+    `scripts/perf/lighthouse-admin.sh` (new). It redacts the session cookie that Lighthouse writes into its reports
+    and signs the session out.
+  - `comparison.md` (before vs after) and `PERFORMANCE.md` (submission draft).
+- **Files:**
+  - `docs/performance/after/**`, `docs/performance/comparison.md`, `docs/performance/PERFORMANCE.md`;
+  - `scripts/perf/lighthouse-admin.sh`.
+- **Requirement:** SRS 5.3-c, Phase 10.
+- **Result:**
+  - All 22 admin routes: First Load JS 675.7–708.2 → **556.0–621.2 kB** raw (207.7–217.2 → 172.4–193.3 kB gzip).
+  - zod is in the first load of 29 → **7** routes, none of them admin.
+  - Lighthouse 100 / 100 / 100, TBT 0 ms, CLS 0.027 everywhere (site header nav).
+  - JS before load 220/221/223 → **183/203/192 KiB**.
+  - Details in `comparison.md`.
+- **Verified by:** the two reports; the token check in the Lighthouse reports found 0 occurrences.
+
 ## 2026-11-07: Finance summary skeleton reserves the report's height (CLS fix)
 
 - **Type:** optimization (layout stability), found by the "after" Lighthouse run.
@@ -426,6 +448,10 @@ Entry template:
   - One keystroke in the search box, with All shown: ___ ms
   - Scrolling commits: ___ ms each
   - Rows in the DOM: 19–31 (measured: 19 at the top, 31 in the middle; 10 visible + 2 × 10 overscan)
+  - Headless (added with the final report: `node scripts/perf/measure-list.mjs /admin/users user-page-size 2000 "tbody tr:not([aria-hidden])" user-search 3`; "before" = `VIRTUALIZE_ABOVE = Infinity`):
+    - render after the response 388–403 → **61–71 ms**;
+    - DOM nodes 17,336 → **669**;
+    - long tasks 212 + 152 ms → **none**.
   - Bundle: /admin/users First Load JS ___ kB (`bash scripts/perf/bundle-report.sh after-virtual`)
 - **Verified by:**
   - `tsc`, eslint, and vitest (106/106);

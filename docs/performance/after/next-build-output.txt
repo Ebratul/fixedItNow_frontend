@@ -1,0 +1,110 @@
+
+> frontend@0.1.0 build:perf
+> set -a && . ./.env.perf && set +a && next build
+
+▲ Next.js 16.4.3 (Turbopack)
+- Environments: .env.local, .env
+✓ Running next.config.ts took 22ms
+- Cache Components enabled
+- Partial Prefetching enabled
+
+  Creating an optimized production build ...
+✓ Compiled successfully in 1509ms
+  Running TypeScript ...
+  Finished TypeScript in 1754ms ...
+  Collecting page data using 15 workers ...
+  Generating static pages using 15 workers (0/65) ...
+  Generating static pages using 15 workers (16/65) 
+  Generating static pages using 15 workers (32/65) 
+  Generating static pages using 15 workers (48/65) 
+✓ Generating static pages using 15 workers (65/65) in 815ms
+  Finalizing page optimization ...
+
+Route (app)
+┌ ◐ /
+├ ○ /_not-found
+├ ○ /about
+├ ○ /account
+├ ○ /account/availability
+├ ○ /account/favorites
+├ ○ /account/notifications
+├ ○ /account/support
+├   /account/support/[id]
+│ └ ◐ /account/support/[id]
+├ ○ /account/support/new
+├ ◐ /admin
+├ ○ /admin/ai
+├ ○ /admin/announcements
+├ ○ /admin/audit
+├ ○ /admin/bookings
+├   /admin/bookings/[id]
+│ └ ◐ /admin/bookings/[id]
+├ ○ /admin/categories
+├ ○ /admin/disputes
+├   /admin/disputes/[id]
+│ └ ◐ /admin/disputes/[id]
+├ ○ /admin/finance
+├ ○ /admin/moderation
+├ ○ /admin/payments
+├   /admin/payments/[reference]
+│ └ ◐ /admin/payments/[reference]
+├ ○ /admin/roles
+├ ○ /admin/settings
+├ ○ /admin/support
+├   /admin/support/[id]
+│ └ ◐ /admin/support/[id]
+├ ○ /admin/system
+├ ○ /admin/users
+├   /admin/users/[id]
+│ └ ◐ /admin/users/[id]
+├ ○ /admin/workers
+├   /admin/workers/[id]
+│ └ ◐ /admin/workers/[id]
+├ ○ /assistant
+├ ○ /become-a-worker
+├ ◐ /bookings
+├   /bookings/[id]
+│ └ ◐ /bookings/[id]
+├   /bookings/[id]/pay
+│ └ ◐ /bookings/[id]/pay
+├ ○ /community
+├   /community/[id]
+│ └ ◐ /community/[id]
+├ ○ /community/proposals
+├ ○ /contact
+├   /demo/[role]
+│ └ ◐ /demo/[role]
+├ ○ /forgot-password
+├ ○ /help
+├ ○ /how-it-works
+├ ○ /icon.svg
+├ ○ /login
+├ ○ /onboarding
+├ ○ /onboarding/customer
+├ ○ /onboarding/worker
+├ ○ /opengraph-image
+├ ○ /payments
+├   /payments/[reference]
+│ └ ◐ /payments/[reference]
+├   /payments/demo/[reference]
+│ └ ◐ /payments/demo/[reference]
+├ ○ /register
+├ ○ /reset-password
+├ ○ /robots.txt
+├ ◐ /services
+├   /services/[slug]
+│ └ ◐ /services/[slug]
+├ ○ /sitemap.xml
+├ ○ /verify-email
+├ ◐ /workers
+├   /workers/[slug]
+│ └ ◐ /workers/[slug]
+└   /workers/[slug]/book
+  └ ◐ /workers/[slug]/book
+
+
+ƒ Proxy (Middleware)
+
+○  (Static)             prerendered as static content
+◐  (Partial Prerender)  prerendered as static HTML with dynamic server-streamed content
+
