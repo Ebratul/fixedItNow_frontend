@@ -19,7 +19,13 @@ export class ApiError extends Error {
  */
 export async function api<T>(
   path: string,
-  init: { method?: "GET" | "PUT" | "PATCH" | "POST" | "DELETE"; body?: unknown; headers?: Record<string, string> } = {},
+  init: {
+    method?: "GET" | "PUT" | "PATCH" | "POST" | "DELETE";
+    body?: unknown;
+    headers?: Record<string, string>;
+    /** Aborts the request (useApi passes one per request and aborts it when the path changes or the view unmounts). */
+    signal?: AbortSignal;
+  } = {},
 ): Promise<T> {
   let response: Response;
   try {
@@ -31,8 +37,11 @@ export async function api<T>(
           ? undefined
           : { ...(init.body === undefined ? {} : { "Content-Type": "application/json" }), ...init.headers },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
+      signal: init.signal,
     });
-  } catch {
+  } catch (error) {
+    // An aborted request is not a connection problem: pass the AbortError through for the caller to ignore.
+    if (init.signal?.aborted) throw error;
     throw new ApiError(0, "We couldn't reach the server. Check your connection and try again.");
   }
 

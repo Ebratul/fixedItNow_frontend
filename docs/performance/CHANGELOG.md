@@ -26,6 +26,34 @@ Entry template:
 
 ---
 
+## 2026-11-07: AbortController for API reads; search requests counted (optimization)
+
+- **Type:** optimization.
+- **What:**
+  - `api()` takes an `AbortSignal`.
+  - `useApi` gives every request its own `AbortController` and aborts it when the path changes (the next debounced
+    search, a filter, a page) or the view unmounts. An aborted request is not reported as an error.
+  - The 300 ms debounce on the /admin/users and /admin/bookings search boxes was already there (`useDebounced`),
+    and is kept.
+- **Files:**
+  - `src/lib/api.ts`, `src/lib/use-api.ts`;
+  - `src/__tests__/use-api-abort.test.tsx` (new);
+  - `scripts/perf/count-search-requests.mjs` (new);
+  - `docs/performance/after/search-requests.md`.
+- **Why:** on a slow connection, every debounced query still ran to completion even when a newer one had
+  replaced it.
+- **Requirement:** SRS 5.3-a, 5.3-c, Phase 10.
+- **Result** (6 keys, "rahman", the same on both pages; details in `after/search-requests.md`):
+  - Fast typing: no debounce = 6 requests; with the 300 ms debounce = 1.
+  - Slow network (600 ms latency, pauses):
+    - before: 3 sent, all 3 completed;
+    - after: 3 sent, **2 aborted**, 1 completed.
+- **Verified by:**
+  - `tsc`, eslint (0 warnings), vitest 431/431, including the new tests:
+    - the old request is aborted on a path change, and its late answer is ignored;
+    - abort on unmount sets no error;
+  - the headless counts above.
+
 ## 2026-11-07: Virtualized /admin/audit list; metadata stringified only for open entries (optimization)
 
 - **Type:** optimization.

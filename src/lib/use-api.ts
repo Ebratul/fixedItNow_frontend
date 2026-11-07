@@ -17,6 +17,9 @@ export type ApiState<T> =
  *   focus and scroll position survive (use after a small mutation on the same page).
  * - `stale` is true while `state` still holds the previous `path`'s data (paging, filtering) and the
  *   new response has not arrived, so lists can show a busy cue instead of silently showing old rows.
+ * - Each request has its own AbortController. When `path` changes (the next debounced search) or the view unmounts,
+ *   the request still in flight is aborted, so the browser and the API stop working on an answer nobody will see,
+ *   and a slow old response can never overwrite a newer one.
  */
 export function useApi<T>(path: string) {
   const [state, setState] = useState<ApiState<T>>({ status: "loading" });
@@ -24,13 +27,13 @@ export function useApi<T>(path: string) {
   const [version, setVersion] = useState(0);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
     const done = (next: ApiState<T>) => {
-      if (cancelled) return;
+      if (controller.signal.aborted) return;
       setState(next);
       setLoadedPath(path);
     };
-    api<T>(path)
+    api<T>(path, { signal: controller.signal })
       .then((data) => done({ status: "ready", data }))
       .catch((error: unknown) => {
         if (error instanceof ApiError && error.status === 401) {
@@ -42,9 +45,7 @@ export function useApi<T>(path: string) {
           });
         }
       });
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [path, version]);
 
   const reload = useCallback(() => {
