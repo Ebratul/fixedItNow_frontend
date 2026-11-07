@@ -18,7 +18,16 @@ import { useApi } from "@/lib/use-api";
 import { adminErrorMessage } from "./admin-errors";
 import type { AuditEntry, AuditList, AuditVerify } from "./types";
 
-const PAGE_SIZE = 25;
+/**
+ * Entries per page. "All (2000+)" asks for one page of 5,000, the backend's only allowed size above 100
+ * (AUDIT_ALL_PAGE_SIZE in backend audit.controller.ts, the same bound as the CSV export). It shows the whole
+ * performance data set (about 2,000 entries) at once.
+ */
+const PAGE_SIZES = [
+  { value: "25", label: "25 per page" },
+  { value: "100", label: "100 per page" },
+  { value: "5000", label: "All (2000+)" },
+] as const;
 
 /** Dates are picked as calendar days and read as Bangladesh time (UTC+6), the platform's time zone. */
 const dayStart = (d: string) => (d ? `${d}T00:00:00+06:00` : "");
@@ -34,6 +43,7 @@ export function AuditView() {
   const [q, setQ] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
+  const [pageSize, setPageSize] = useState<string>("25");
   const [page, setPage] = useState(1);
   const [exportState, setExportState] = useState<{ pending: boolean; error?: string }>({ pending: false });
 
@@ -47,7 +57,7 @@ export function AuditView() {
     to: dayEnd(to),
   };
   const filterQuery = buildQuery(filters);
-  const { state, reload, stale } = useApi<AuditList>(`/admin/audit${buildQuery({ ...filters, page, pageSize: PAGE_SIZE })}`);
+  const { state, reload, stale } = useApi<AuditList>(`/admin/audit${buildQuery({ ...filters, page, pageSize: Number(pageSize) })}`);
   const filtered = filterQuery !== "";
   const reset = <T,>(set: (v: T) => void) => (v: T) => { set(v); setPage(1); };
 
@@ -80,7 +90,8 @@ export function AuditView() {
         <TextInput id="audit-actor" label="Actor id" hint="The administrator who acted." value={actorId} maxLength={64} onChange={(e) => { setActorId(e.target.value); setPage(1); }} />
         <TextInput id="audit-from" type="date" label="From (Bangladesh time)" value={from} max={to || undefined} onChange={(e) => { setFrom(e.target.value); setPage(1); }} />
         <TextInput id="audit-to" type="date" label="To (Bangladesh time)" value={to} min={from || undefined} onChange={(e) => { setTo(e.target.value); setPage(1); }} />
-        <div className="sm:col-span-2 lg:col-span-3">
+        <SelectInput id="audit-page-size" label="Entries per page" placeholder={null} value={pageSize} onChange={(e) => { setPageSize(e.target.value); setPage(1); }} options={PAGE_SIZES} />
+        <div className="sm:col-span-2 lg:col-span-2">
           <TextInput id="audit-q" label="Free text" hint="Matches the action name or the target id. Details are not searched." value={q} maxLength={80} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
         </div>
       </form>

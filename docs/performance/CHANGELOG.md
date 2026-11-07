@@ -26,6 +26,26 @@ Entry template:
 
 ---
 
+## 2026-11-07: "All (2000+)" page size on /admin/audit + baseline measurement (tooling)
+
+- **Type:** tooling and measurement. No optimization.
+- **What:** /admin/audit has an "Entries per page" menu: 25 (default), 100, or "All (2000+)". All asks for
+  `pageSize=5000`, the backend's only accepted size above 100, which is the same bound as the CSV export.
+- **What else:** `scripts/perf/measure-list.mjs` measures a long list in headless Chrome. It reports switch time,
+  render time after the response, DOM items and nodes, long tasks, and key-event latency while typing.
+- **Files:**
+  - frontend `src/components/admin/people/audit-view.tsx`, `scripts/perf/measure-list.mjs`,
+    `docs/performance/before/audit-all.md`;
+  - backend `src/admin/audit/audit.controller.ts` (`AUDIT_ALL_PAGE_SIZE`), `test/admin-audit-settings.e2e-spec.ts`.
+- **Why:** to get a baseline for the audit virtualization (next entry).
+- **Requirement:** SRS 5.3-a (still bounded), 5.3-c, Phase 10.
+- **Result (before):** median of 3 runs, details in `before/audit-all.md`:
+  - render after response 457 ms;
+  - 2,003 entries / 28,527 DOM nodes;
+  - long tasks of 241 + 173 ms on the switch.
+- **Verified by:** backend `tsc`, unit tests 151/151, and `admin-audit-settings` e2e 15/15 (5000 accepted; 101, 1000
+  and 5001 rejected); frontend `tsc` and eslint.
+
 ## 2026-11-07: Virtualized /admin/users table for long results (optimization)
 
 - **Type:** optimization.
