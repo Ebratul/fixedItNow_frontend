@@ -26,6 +26,42 @@ Entry template:
 
 ---
 
+## 2026-11-07: Users filter form as its own component (state colocation) (optimization)
+
+- **Type:** optimization (structure). The measured gain is small; see Result.
+- **What:**
+  - The search box and the four selects of /admin/users moved into `UsersFilterForm`, which owns their input state.
+  - `UsersList` keeps only the applied filters and the page.
+  - A select reports its value from its own `onChange`. The search text is reported by a 300 ms timer in the
+    handler (`SEARCH_DEBOUNCE_MS`). No effect syncs the two components; a first version that did doubled the
+    commits after the debounce, 2 → 4, so it was replaced.
+  - A real filter change resets the page to 1.
+- **Files:**
+  - `src/components/admin/people/users-list.tsx`;
+  - `scripts/perf/profile-typing.mjs` (new): React commit times while typing, read through a minimal DevTools hook
+    in dev mode.
+- **Why:**
+  - B3 in `before/bottlenecks.md`: every keystroke re-rendered the users page.
+  - Typing should touch only the input.
+- **Requirement:** SRS 5.3-c, Phase 10.
+- **Result** (`node scripts/perf/profile-typing.mjs /admin/users user-search rahman [user-page-size=2000]`, 3 runs
+  each, :3101 dev):
+
+  | | Before (previous commit) | After |
+  | --- | --- | --- |
+  | Keystroke commits for 6 keys | 6–7 | 6 |
+  | Slowest keystroke commit | 1.1–1.4 ms | 0.8–1.2 ms |
+  | All keystroke commits together (All shown) | 5.1–6.3 ms | 3.7–5.2 ms |
+  | Commits after the debounce | 2 | 2 |
+
+  Honest reading: even before, a keystroke did not re-render the table. The React Compiler (on in this project)
+  already memoizes the list, so it was skipped when its props did not change. The 8.7 ms DataTable commit in the
+  baseline profile is a data commit (new rows), not a keystroke. Colocation makes this independent of the
+  compiler and trims the keystroke total by about 20 %.
+- **Verified by:**
+  - `tsc`, eslint (0 warnings), vitest 431/431;
+  - the users-table browser script (24 checks) still passes.
+
 ## 2026-11-07: AbortController for API reads; search requests counted (optimization)
 
 - **Type:** optimization.

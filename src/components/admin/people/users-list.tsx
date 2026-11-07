@@ -2,8 +2,8 @@
 
 import { Users } from "lucide-react";
 import Link from "next/link";
-import { useState } from "react";
-import { AdminPage, ApiView, buildQuery, DataTable, useDebounced, type Column } from "@/components/admin/kit";
+import { useEffect, useRef, useState } from "react";
+import { AdminPage, ApiView, buildQuery, DataTable, type Column } from "@/components/admin/kit";
 import { VirtualDataTable } from "@/components/admin/kit/virtual-data-table";
 import { Pager } from "@/components/community/community-shell";
 import { Badge } from "@/components/ui/badge";
@@ -79,30 +79,69 @@ const columns: Column<UserRow>[] = [
   { key: "joined", header: "Joined", hideBelow: "lg", width: "8rem", cell: (u) => formatDate(u.createdAt) },
 ];
 
-/** Searchable, filterable, paginated list of every account (`GET /admin/users`). */
-export function UsersList() {
+/** The filters the list is showing. `search` is the debounced, trimmed search text. */
+type UserFilters = { search: string; role: string; status: string; kind: string; pageSize: string };
+const NO_FILTERS: UserFilters = { search: "", role: "", status: "", kind: "", pageSize: DEFAULT_PAGE_SIZE };
+/** Quiet time after the last key before a search is sent (the same as `useDebounced`). */
+const SEARCH_DEBOUNCE_MS = 300;
+
+/**
+ * The filter form, with its own input state (state colocation). Typing re-renders only this form.
+ * - A select reports its value straight away.
+ * - The search text is reported once typing pauses for SEARCH_DEBOUNCE_MS.
+ * The reports come from the event handlers themselves, not an effect, so the list re-renders once per change.
+ */
+function UsersFilterForm({ onChange }: { onChange: (change: Partial<UserFilters>) => void }) {
   const [q, setQ] = useState("");
   const [role, setRole] = useState("");
   const [status, setStatus] = useState("");
   const [kind, setKind] = useState("");
   const [pageSize, setPageSize] = useState<string>(DEFAULT_PAGE_SIZE);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  const onSearch = (value: string) => {
+    setQ(value);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => onChange({ search: value.trim() }), SEARCH_DEBOUNCE_MS);
+  };
+  const select = (set: (v: string) => void, key: keyof UserFilters) => (value: string) => {
+    set(value);
+    onChange({ [key]: value });
+  };
+
+  return (
+    <form role="search" aria-label="Filter users" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" onSubmit={(e) => e.preventDefault()}>
+      <div className="sm:col-span-2 lg:col-span-4">
+        <SearchInput id="user-search" label="Search by name, email or user id" placeholder="Name, email or id" value={q} maxLength={100} onChange={(e) => onSearch(e.target.value)} />
+      </div>
+      <SelectInput id="user-role" label="Account role" placeholder="All roles" value={role} onChange={(e) => select(setRole, "role")(e.target.value)} options={[{ value: "USER", label: "Regular users" }, { value: "ADMIN", label: "Administrators" }]} />
+      <SelectInput id="user-status" label="Status" placeholder="Any status" value={status} onChange={(e) => select(setStatus, "status")(e.target.value)} options={[{ value: "active", label: "Active" }, { value: "suspended", label: "Suspended" }]} />
+      <SelectInput id="user-kind" label="Profile" placeholder="Any profile" value={kind} onChange={(e) => select(setKind, "kind")(e.target.value)} options={[{ value: "customer", label: "Customers" }, { value: "worker", label: "Workers" }]} />
+      <SelectInput id="user-page-size" label="Rows per page" placeholder={null} value={pageSize} onChange={(e) => select(setPageSize, "pageSize")(e.target.value)} options={PAGE_SIZES} />
+    </form>
+  );
+}
+
+/** Searchable, filterable, paginated list of every account (`GET /admin/users`). */
+export function UsersList() {
+  const [filters, setFilters] = useState<UserFilters>(NO_FILTERS);
   const [page, setPage] = useState(1);
-  const search = useDebounced(q.trim());
+  const { search, role, status, kind, pageSize } = filters;
   const path = `/admin/users${buildQuery({ q: search, role, status, kind, page, pageSize: Number(pageSize) })}`;
   const { state, reload, stale } = useApi<UserList>(path);
   const filtered = Boolean(search || role || status || kind);
+  // A real change of the filters starts again at page 1 (a search that trims to the same text changes nothing).
+  const applyFilters = (change: Partial<UserFilters>) => {
+    const next = { ...filters, ...change };
+    if ((Object.keys(next) as (keyof UserFilters)[]).every((k) => next[k] === filters[k])) return;
+    setFilters(next);
+    setPage(1);
+  };
 
   return (
     <AdminPage title="Users" description="Every account on the platform. Open a user to see their activity and, with the right permission, suspend them or manage their admin access." permission="users.read">
-      <form role="search" aria-label="Filter users" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" onSubmit={(e) => e.preventDefault()}>
-        <div className="sm:col-span-2 lg:col-span-4">
-          <SearchInput id="user-search" label="Search by name, email or user id" placeholder="Name, email or id" value={q} maxLength={100} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-        </div>
-        <SelectInput id="user-role" label="Account role" placeholder="All roles" value={role} onChange={(e) => { setRole(e.target.value); setPage(1); }} options={[{ value: "USER", label: "Regular users" }, { value: "ADMIN", label: "Administrators" }]} />
-        <SelectInput id="user-status" label="Status" placeholder="Any status" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} options={[{ value: "active", label: "Active" }, { value: "suspended", label: "Suspended" }]} />
-        <SelectInput id="user-kind" label="Profile" placeholder="Any profile" value={kind} onChange={(e) => { setKind(e.target.value); setPage(1); }} options={[{ value: "customer", label: "Customers" }, { value: "worker", label: "Workers" }]} />
-        <SelectInput id="user-page-size" label="Rows per page" placeholder={null} value={pageSize} onChange={(e) => { setPageSize(e.target.value); setPage(1); }} options={PAGE_SIZES} />
-      </form>
+      <UsersFilterForm onChange={applyFilters} />
 
       <ApiView state={state} reload={reload} skeleton={<Skeleton className="h-64" />}>
         {(data) =>
