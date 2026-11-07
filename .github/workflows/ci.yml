@@ -1,0 +1,43 @@
+# Continuous integration. It uses NO secrets and NO production credentials: every
+# value below is a throwaway for a disposable service container. It never deploys
+# and never touches a real database or provider. Failed checks fail the job.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (lint, types, tests, build, audit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --audit-level=high
+
+  image:
+    name: Container image build (no push)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build --build-arg BACKEND_URL=http://api:4000 -t fixeditnow-web .
