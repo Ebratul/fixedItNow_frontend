@@ -26,6 +26,36 @@ Entry template:
 
 ---
 
+## 2026-11-07: Finance what-if commission rate: state colocation + debounce (optimization)
+
+- **Type:** optimization.
+- **What:**
+  - The what-if rate field of the commission report is its own component, `WhatIfRateInput`, which owns its text
+    state.
+  - Validation shows at once.
+  - A valid rate reaches the report after 400 ms of quiet, from a timer in the handler (no effect). Debounce was
+    chosen over `useDeferredValue` because each applied rate is an API request: deferring a render would still
+    fetch on every key.
+  - "Invalid" is reported only when it flips, to disable the export.
+  - The CSV export now uses the rate the report shows. Before, it used the live, not yet applied text.
+- **Files:** `src/components/admin/ops/finance-view.tsx` (`WhatIfRateInput`, `CommissionReport`).
+- **Why:** B5 in `before/bottlenecks.md`: typing re-rendered the whole report (Alert, Card, 4 StatCards) on every
+  key.
+- **Requirement:** SRS 5.3-c, Phase 10.
+- **Result** (`node scripts/perf/profile-typing.mjs /admin/finance commission-rate 1250`, 3 runs, :3101 dev):
+
+  | | Before | After |
+  | --- | --- | --- |
+  | Keystroke commits for 4 keys | 5 | 4 |
+  | Slowest keystroke commit | 3.1–4.6 ms | **0.6–0.7 ms** |
+  | All keystroke commits together | 9.0–11.7 ms | **1.2–1.7 ms** |
+  | Report requests for "1250" | 1 (after 400 ms) | 1 (after 400 ms) |
+
+- **Verified by:**
+  - `tsc`, eslint (0 warnings), vitest 431/431;
+  - headless check: "12a" shows the error and disables Export, "1250" applies 12.5 % and re-enables it, and an
+    empty field returns to the configured rate; no console errors.
+
 ## 2026-11-07: Users filter form as its own component (state colocation) (optimization)
 
 - **Type:** optimization (structure). The measured gain is small; see Result.

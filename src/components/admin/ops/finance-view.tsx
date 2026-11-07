@@ -1,8 +1,8 @@
 "use client";
 
 import { Download, Info } from "lucide-react";
-import { useState } from "react";
-import { ApiView, DataTable, StatCard, StatGrid, buildQuery, downloadFile, useDebounced, type Column } from "@/components/admin/kit";
+import { useEffect, useRef, useState } from "react";
+import { ApiView, DataTable, StatCard, StatGrid, buildQuery, downloadFile, type Column } from "@/components/admin/kit";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -115,23 +115,59 @@ function SummaryReport({ range }: { range: { from: string; to: string } }) {
   );
 }
 
+/** Quiet time after the last key before a what-if rate is applied (it fetches a new report). */
+const RATE_DEBOUNCE_MS = 400;
+
+const rateProblemOf = (text: string) =>
+  text && !/^\d+$/.test(text) ? "Enter a whole number of basis points." : text && Number(text) > 5000 ? "The rate can be at most 5000 basis points (50%)." : undefined;
+
+/**
+ * The what-if rate input, with its own text state (state colocation). Typing re-renders only this field.
+ * - Validation shows at once.
+ * - The report hears about a valid rate after RATE_DEBOUNCE_MS of quiet, from a timer in the handler (no effect).
+ * - Whether the text is invalid is reported only when that changes, so the report can disable the export.
+ */
+function WhatIfRateInput({ configuredRateBps, onRate }: { configuredRateBps: number; onRate: (change: { rate?: number; invalid: boolean }) => void }) {
+  const [text, setText] = useState("");
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const lastInvalid = useRef(false);
+  useEffect(() => () => clearTimeout(timer.current), []);
+  const problem = rateProblemOf(text.trim());
+
+  const onChange = (value: string) => {
+    setText(value);
+    const trimmed = value.trim();
+    const invalid = Boolean(rateProblemOf(trimmed));
+    if (invalid !== lastInvalid.current) {
+      lastInvalid.current = invalid;
+      onRate({ invalid });
+    }
+    clearTimeout(timer.current);
+    if (invalid) return;
+    timer.current = setTimeout(() => onRate({ rate: trimmed === "" ? undefined : Number(trimmed), invalid: false }), RATE_DEBOUNCE_MS);
+  };
+
+  return (
+    <TextInput id="commission-rate" label="What-if rate (basis points, 0 to 5000)" inputMode="numeric" value={text} onChange={(e) => onChange(e.target.value)} placeholder={String(configuredRateBps)} hint="100 basis points = 1%. Leave empty to use the configured rate." error={problem} />
+  );
+}
+
 function CommissionReport({ range }: { range: { from: string; to: string } }) {
-  const [rateText, setRateText] = useState("");
+  // The applied what-if rate (debounced by WhatIfRateInput) and whether the field currently holds an invalid value.
+  const [rate, setRate] = useState<{ rate?: number; invalid: boolean }>({ invalid: false });
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string>();
-  const debounced = useDebounced(rateText.trim(), 400);
-  const rateProblem = rateText.trim() && !/^\d+$/.test(rateText.trim()) ? "Enter a whole number of basis points." : rateText.trim() && Number(rateText.trim()) > 5000 ? "The rate can be at most 5000 basis points (50%)." : undefined;
-  const override = !rateProblem && debounced !== "" && /^\d+$/.test(debounced) && Number(debounced) <= 5000 ? Number(debounced) : undefined;
-  const query = buildQuery({ ...range, rateBps: override });
-  const liveText = rateText.trim();
-  const exportQuery = buildQuery({ ...range, rateBps: !rateProblem && /^\d+$/.test(liveText) ? Number(liveText) : undefined });
+  const query = buildQuery({ ...range, rateBps: rate.rate });
   const { state, reload, stale } = useApi<Commission>(`/admin/finance/commission${query}`);
+  const onRate = (change: { rate?: number; invalid: boolean }) =>
+    setRate((prev) => ("rate" in change ? { rate: change.rate, invalid: change.invalid } : { ...prev, invalid: change.invalid }));
 
   async function exportCsv() {
     setExporting(true);
     setExportError(undefined);
     try {
-      await downloadFile(`/admin/finance/commission/export${exportQuery}`, "commission-report.csv");
+      // Exports the figures on screen: the same period and applied rate as the report.
+      await downloadFile(`/admin/finance/commission/export${query}`, "commission-report.csv");
     } catch (e) {
       setExportError(errorText(e));
     } finally {
@@ -156,7 +192,7 @@ function CommissionReport({ range }: { range: { from: string; to: string } }) {
               <Card className="space-y-3 p-4">
                 <p className="text-xs font-semibold text-ink-subtle">Configured commission rate</p>
                 <p className="text-2xl font-extrabold text-brand-950 tabular-nums">{percent(c.configuredRateBps)} <span className="text-sm font-medium text-ink-muted">({c.configuredRateBps} bps)</span></p>
-                <TextInput id="commission-rate" label="What-if rate (basis points, 0 to 5000)" inputMode="numeric" value={rateText} onChange={(e) => setRateText(e.target.value)} placeholder={String(c.configuredRateBps)} hint="100 basis points = 1%. Leave empty to use the configured rate." error={rateProblem} />
+                <WhatIfRateInput configuredRateBps={c.configuredRateBps} onRate={onRate} />
                 {c.rateSource === "override" && (
                   <p className="flex items-start gap-2 text-sm text-warning"><Info className="mt-0.5 size-4 shrink-0" aria-hidden /> Showing a what-if rate of {percent(c.rateBps)}, not the configured one.</p>
                 )}
@@ -169,7 +205,7 @@ function CommissionReport({ range }: { range: { from: string; to: string } }) {
               </StatGrid>
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <Button variant="secondary" onClick={exportCsv} loading={exporting} disabled={Boolean(rateProblem)}><Download className="size-4" aria-hidden /> Export CSV</Button>
+              <Button variant="secondary" onClick={exportCsv} loading={exporting} disabled={rate.invalid}><Download className="size-4" aria-hidden /> Export CSV</Button>
               <span className="text-sm text-ink-muted">Exports the daily figures for this period and rate. Each export is recorded in the audit log.</span>
             </div>
             {exportError && <Alert tone="error">{exportError}</Alert>}
