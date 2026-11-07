@@ -26,6 +26,65 @@ Entry template:
 
 ---
 
+## 2026-11-07: Server Components for the dashboard figures and the user detail (optimization)
+
+- **Type:** optimization (Server/Client boundary).
+- **What:**
+  - **/admin:**
+    - `page.tsx` is a Server Component that reads `?days=`;
+    - `DashboardSummary` (server, async) fetches `/admin/dashboard` with the visitor's own session;
+    - `DashboardBody` renders the stat cards, "Needs attention", money and recent activity as server HTML / RSC;
+    - Client Components remain only for `DashboardFrame` (page frame, permission check, period select) and the
+      charts (`LazyBarChart`);
+    - the period select updates `?days=` in a transition (`useTransition` + `useOptimistic`), so the old figures
+      stay, dimmed, until the new ones stream in;
+    - `DashboardSkeleton` is the Suspense fallback.
+  - **/admin/users/[id]:**
+    - `UserDetail` (server, async) fetches the account; an unknown id gives `notFound()`;
+    - `UserFacts`, `UserActivity` (stat cards) and `RecentActions` are server-rendered;
+    - `UserAccountActions` (suspension, admin access with the role select) stays a Client Component; after a change
+      it calls `router.refresh()`, so the server parts update too.
+  - **Shared:**
+    - `lib/server-admin-api.ts`: a server-only GET that forwards only the session cookie, `no-store`, and returns
+      failure as a status;
+    - `UserBadges` moved to a directive-free module so both sides can use it;
+    - the dashboard's period constants live in a plain module, because values exported from a "use client" module
+      reach the server only as client references.
+- **Files:**
+  - `src/app/admin/page.tsx`, `src/app/admin/users/[id]/page.tsx`;
+  - `src/components/admin/dashboard/{dashboard-body,dashboard-summary,dashboard-frame,dashboard-windows}.ts(x)`
+    (`dashboard-view.tsx` removed);
+  - `src/components/admin/people/{user-detail,user-detail-sections,user-detail-server,user-badges,users-list}.tsx`;
+  - `src/lib/server-admin-api.ts` (new), `src/lib/server-api.ts` (`SESSION_COOKIES` exported);
+  - tests `admin-dashboard.test.tsx`, `admin-people.test.tsx`, `admin-server-reads.test.tsx` (new).
+- **Why:**
+  - These sections are read-only: no reason to ship their code to the browser, or to make the browser fetch the
+    data only after the JavaScript runs.
+  - The server reads the data while it streams the page, in parallel with the client's `/me` check.
+- **Requirement:** SRS 5.3-c, Phase 10.
+- **Result:**
+  - Headless check on :3101:
+    - /admin showed "Users 1507" while the browser made **0** `/api/v1/admin/dashboard` requests (read on the
+      server);
+    - the period change re-rendered via `?days=90`;
+    - the user detail facts, counts and recent actions render, with the role select and Suspend button working;
+    - an unknown id gives the 404 page;
+    - no console errors.
+  - Period change on the client (`profile-select.mjs`): 8–10 commits (navigation) and 20–22 ms slowest at 90 days,
+    against 17–18 ms in the previous step. The client cost of one change did not drop: the charts still re-render
+    with the new data. The gain is in JavaScript shipped and in the data path. Bundle numbers come with the
+    "after" report.
+  - Limitation: `AdminShell` (client) still decides on the client whether to show the page, so the server HTML of
+    these sections is not displayed before `/me` answers. The data and markup arrive in the RSC payload without a
+    second round trip.
+- **Verified by:**
+  - `tsc`, eslint (0 warnings), vitest 436/436, including new tests:
+    - `serverAdminApi` forwards only the session cookie, uncached, and reports 401/403/0;
+    - `UserDetail` handles 404 → notFound, 403 → message, no session → nothing;
+    - `DashboardSummary` reads the chosen period;
+    - `DashboardFrame` changes `?days=` and checks the permission;
+  - the headless check above.
+
 ## 2026-11-07: Admin log-in form lazy-loaded, so zod leaves the admin routes (optimization)
 
 - **Type:** optimization (bundle).

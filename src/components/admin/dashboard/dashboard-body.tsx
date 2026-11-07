@@ -1,16 +1,17 @@
-"use client";
-
 import Link from "next/link";
 import { CheckCircle2 } from "lucide-react";
-import { useState } from "react";
-import { AdminPage, ApiView, StatCard, StatGrid } from "@/components/admin/kit";
+import { StatCard, StatGrid } from "@/components/admin/kit/stat-card";
 import { Card } from "@/components/ui/card";
-import { SelectInput } from "@/components/ui/select-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBdt, formatDateTime } from "@/lib/format";
-import { useApi } from "@/lib/use-api";
 import type { Point } from "./bar-chart";
-import { LazyBarChart } from "./lazy-bar-chart";
+import { BarChartSkeleton, LazyBarChart } from "./lazy-bar-chart";
+
+/*
+ * The dashboard's figures. No "use client": this module renders on the server (DashboardSummary), so its stat
+ * cards, "Needs attention", money and recent-activity sections ship as HTML with no JavaScript. Only the charts are
+ * Client Components (LazyBarChart: hover and the table toggle), loaded as their own chunk.
+ */
 
 export type Dashboard = {
   generatedAt: string;
@@ -24,28 +25,7 @@ export type Dashboard = {
   recentActivity: { id: string; action: string; targetType: string; at: string; by: string }[] | null;
 };
 
-const WINDOWS = [{ value: "7", label: "Last 7 days" }, { value: "14", label: "Last 14 days" }, { value: "30", label: "Last 30 days" }, { value: "90", label: "Last 90 days" }];
-
-export function DashboardView() {
-  const [days, setDays] = useState("30");
-  const { state, reload, stale } = useApi<Dashboard>(`/admin/dashboard?days=${days}`);
-  return (
-    <AdminPage
-      title="Dashboard"
-      permission="dashboard.view"
-      description="Live figures from the database. Only the sections your role can open are shown."
-      actions={<SelectInput id="dash-days" label="Period" hideLabel placeholder={null} value={days} onChange={(e) => setDays(e.target.value)} options={WINDOWS} />}
-    >
-      <div aria-busy={stale || undefined} className={stale ? "opacity-60 transition-opacity" : undefined}>
-        <ApiView state={state} reload={reload} skeleton={<div className="space-y-4"><Skeleton className="h-24" /><Skeleton className="h-48" /></div>}>
-          {(d) => <Body d={d} />}
-        </ApiView>
-      </div>
-    </AdminPage>
-  );
-}
-
-function Body({ d }: { d: Dashboard }) {
+export function DashboardBody({ d }: { d: Dashboard }) {
   const open = d.attention.filter((a) => a.count > 0);
   return (
     <div className="space-y-8">
@@ -109,6 +89,20 @@ function Body({ d }: { d: Dashboard }) {
           </Card>
         </section>
       )}
+    </div>
+  );
+}
+
+/** The dashboard's layout while the figures load: the stat grids and the three chart boxes at their real height. */
+export function DashboardSkeleton() {
+  return (
+    <div className="space-y-8" aria-busy="true" aria-label="Loading the dashboard">
+      <Skeleton className="h-24" />
+      <Skeleton className="h-48" />
+      <div className="grid gap-4 lg:grid-cols-2">
+        <BarChartSkeleton title="New users per day" />
+        <BarChartSkeleton title="New bookings per day" />
+      </div>
     </div>
   );
 }

@@ -1,92 +1,37 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
-import { useId, useState, type ReactNode } from "react";
-import { AdminPage, ApiView, StatCard, StatGrid } from "@/components/admin/kit";
+import { useRouter } from "next/navigation";
+import { useId, useState } from "react";
+import { ApiView } from "@/components/admin/kit";
 import { useAdmin } from "@/components/admin/shell/admin-context";
 import { Alert } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { SelectInput } from "@/components/ui/select-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { api } from "@/lib/api";
-import { formatDateTime } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
 import { readableError } from "./admin-errors";
 import type { RoleRow, UserDetail } from "./types";
-import { UserBadges } from "./users-list";
 
-/** One account: facts, counts, recent admin actions and (permission permitting) suspension and admin access. */
-export function UserDetailView({ id }: { id: string }) {
-  const { state, reload, refresh } = useApi<{ user: UserDetail }>(`/admin/users/${encodeURIComponent(id)}`);
-  const [notice, setNotice] = useState<string>();
-
-  return (
-    <AdminPage title="User" permission="users.read" description={<Link href="/admin/users" className="inline-flex items-center gap-1.5 font-semibold text-brand-800 hover:underline"><ArrowLeft className="size-4" aria-hidden />All users</Link>}>
-      <div aria-live="polite">{notice && <Alert tone="success">{notice}</Alert>}</div>
-      <ApiView state={state} reload={reload} skeleton={<Skeleton className="h-72" />}>
-        {({ user }) => (
-          <Detail
-            user={user}
-            onChanged={(message) => {
-              setNotice(message);
-              refresh();
-            }}
-          />
-        )}
-      </ApiView>
-    </AdminPage>
-  );
-}
-
-function Fact({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-xs font-semibold text-ink-subtle">{label}</dt>
-      <dd className="mt-0.5 break-words">{children}</dd>
-    </div>
-  );
-}
-
-function Detail({ user, onChanged }: { user: UserDetail; onChanged: (message: string) => void }) {
+/**
+ * The interactive part of /admin/users/[id]: suspension and admin access (the role select). This is the page's
+ * only Client Component; the facts, counts and recent actions around it are rendered on the server. After a
+ * change it asks the server for a fresh page (`router.refresh()`), so the server-rendered parts update too.
+ */
+export function UserAccountActions({ user }: { user: UserDetail }) {
   const { can, me } = useAdmin();
+  const router = useRouter();
+  const [notice, setNotice] = useState<string>();
   const isSelf = me.user.id === user.id;
-  const c = user.counts;
+  const onChanged = (message: string) => {
+    setNotice(message);
+    router.refresh();
+  };
   return (
     <>
-      <Card className="p-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <h2 className="text-xl font-extrabold text-brand-950">{user.name || "(no name)"}</h2>
-          {user.suspended ? <Badge tone="danger">Suspended</Badge> : <Badge tone="success">Active</Badge>}
-        </div>
-        <div className="mt-2"><UserBadges user={user} /></div>
-        <dl className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <Fact label="Email">{user.email} <span className="text-xs text-ink-subtle">({user.emailVerified ? "verified" : "not verified"})</span></Fact>
-          <Fact label="User id"><span className="font-mono text-xs">{user.id}</span></Fact>
-          <Fact label="Account role">{user.role === "ADMIN" ? `Administrator${user.adminRole ? `: ${user.adminRole.name}` : ""}` : "Regular user"}</Fact>
-          <Fact label="Joined">{formatDateTime(user.createdAt)}</Fact>
-          <Fact label="Last updated">{formatDateTime(user.updatedAt)}</Fact>
-          <Fact label="Signed in on">{user.activeSessions} {user.activeSessions === 1 ? "device" : "devices"}</Fact>
-          {user.customerProfile && <Fact label="Customer profile">{user.customerProfile.displayName ?? "No display name"}{user.customerProfile.preferredDivision ? `, ${user.customerProfile.preferredDivision}` : ""}</Fact>}
-          {user.worker && <Fact label="Worker profile">{user.worker.published ? "Published" : "Not published"}</Fact>}
-        </dl>
-      </Card>
-
-      <section aria-labelledby="counts-h" className="space-y-3">
-        <h2 id="counts-h" className="text-lg font-bold text-brand-950">Activity</h2>
-        <StatGrid>
-          <StatCard label="Bookings as customer" value={c.bookingsAsCustomer} />
-          <StatCard label="Bookings as worker" value={c.bookingsAsWorker} />
-          <StatCard label="Support tickets" value={c.supportTickets} />
-          <StatCard label="Reports filed" value={c.reportsFiled} />
-          <StatCard label="Community posts" value={c.posts} />
-          <StatCard label="Reviews written" value={c.reviews} />
-        </StatGrid>
-      </section>
-
+      <div aria-live="polite">{notice && <Alert tone="success">{notice}</Alert>}</div>
       <section aria-labelledby="suspension-h" className="space-y-3">
         <h2 id="suspension-h" className="text-lg font-bold text-brand-950">Suspension</h2>
         {user.suspended ? (
@@ -104,22 +49,6 @@ function Detail({ user, onChanged }: { user: UserDetail; onChanged: (message: st
       </section>
 
       {!isSelf && can("admins.assign") && <AdminAccessCard user={user} onChanged={onChanged} />}
-
-      <section aria-labelledby="actions-h" className="space-y-3">
-        <h2 id="actions-h" className="text-lg font-bold text-brand-950">Recent admin actions on this account</h2>
-        {user.recentActions.length === 0 ? (
-          <p className="text-ink-muted">No administrator has acted on this account yet.</p>
-        ) : (
-          <ul className="divide-y divide-line rounded-card border border-line bg-canvas">
-            {user.recentActions.map((a) => (
-              <li key={a.id} className="px-4 py-3 text-sm">
-                <p><span className="font-mono font-semibold">{a.action}</span> by {a.by} <span className="text-ink-subtle">· {formatDateTime(a.createdAt)}</span></p>
-                {a.reason && <p className="mt-1 text-ink-muted">Reason: {a.reason}</p>}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
     </>
   );
 }

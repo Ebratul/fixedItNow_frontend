@@ -14,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
 import type { UserList, UserRow } from "./types";
+import { UserBadges } from "./user-badges";
 
 /**
  * Rows per page. "All (1000+)" asks for one page of 2,000, which is the backend's only allowed size above 50
@@ -33,25 +34,6 @@ const DEFAULT_PAGE_SIZE = "20";
 const VIRTUALIZE_ABOVE = 100;
 const OVERSCAN = 10;
 const rowKey = (u: UserRow) => u.id;
-
-export const VERIFICATION_LABELS: Record<string, string> = {
-  NOT_SUBMITTED: "not submitted",
-  PENDING: "pending review",
-  VERIFIED: "verified",
-  REJECTED: "rejected",
-  RESUBMISSION_REQUIRED: "resubmission required",
-};
-
-export function UserBadges({ user }: { user: UserRow }) {
-  return (
-    <div className="flex flex-wrap gap-1.5">
-      {user.role === "ADMIN" && <Badge tone="brand">Admin{user.adminRole ? `: ${user.adminRole.name}` : ""}</Badge>}
-      {user.isCustomer && <Badge>Customer</Badge>}
-      {user.worker && <Badge tone={user.worker.verificationStatus === "VERIFIED" ? "success" : "neutral"}>Worker: {VERIFICATION_LABELS[user.worker.verificationStatus] ?? user.worker.verificationStatus.toLowerCase()}</Badge>}
-      {!user.isCustomer && !user.worker && user.role !== "ADMIN" && <Badge>No profile yet</Badge>}
-    </div>
-  );
-}
 
 const columns: Column<UserRow>[] = [
   {

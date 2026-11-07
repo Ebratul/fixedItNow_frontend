@@ -11,7 +11,7 @@ export class ServerApiError extends Error {
 }
 
 /** Better Auth's session cookie, plain and `__Secure-` (production over HTTPS). */
-const SESSION_COOKIES = ["better-auth.session_token", "__Secure-better-auth.session_token"];
+export const SESSION_COOKIES = ["better-auth.session_token", "__Secure-better-auth.session_token"];
 
 /**
  * Server-side fetch of PUBLIC backend endpoints. These calls never return per-user data: the only thing forwarded from

@@ -2,7 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from "@testing-library/rea
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }), usePathname: () => "/admin/users" }));
+const refresh = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh }), usePathname: () => "/admin/users" }));
 const api = vi.fn();
 vi.mock("@/lib/api", () => ({
   api: (...a: unknown[]) => api(...a),
@@ -30,7 +31,8 @@ import { AuditView } from "@/components/admin/people/audit-view";
 import { RoleEditor, validateRole } from "@/components/admin/people/role-editor";
 import { RolesView } from "@/components/admin/people/roles-view";
 import { SettingsView } from "@/components/admin/people/settings-view";
-import { UserDetailView } from "@/components/admin/people/user-detail";
+import { UserDetailContent } from "@/components/admin/people/user-detail-sections";
+import type { UserDetail } from "@/components/admin/people/types";
 import { UsersList } from "@/components/admin/people/users-list";
 import { ApiError } from "@/lib/api";
 import { adminErrorMessage, readableError } from "@/components/admin/people/admin-errors";
@@ -119,6 +121,9 @@ describe("users list", () => {
   });
 });
 
+/** The user detail as the page renders it: the server-read data handed to the server sections and the client island. */
+const detailView = (id: string) => <UserDetailContent user={(data[`/admin/users/${id}`] as { user: UserDetail }).user} />;
+
 describe("user detail", () => {
   beforeEach(() => {
     data["/admin/users/user-abc-123"] = detail();
@@ -126,7 +131,7 @@ describe("user detail", () => {
   });
 
   it("shows account facts, counts and recent admin actions", () => {
-    renderAs(ALL, <UserDetailView id="user-abc-123" />);
+    renderAs(ALL, detailView("user-abc-123"));
     expect(screen.getByText("rahim@example.com", { exact: false })).toBeInTheDocument();
     expect(screen.getByText("Bookings as customer").nextSibling).toHaveTextContent("3");
     expect(screen.getByText("user.suspend")).toBeInTheDocument();
@@ -134,14 +139,14 @@ describe("user detail", () => {
   });
 
   it("hides action controls the admin lacks permission for", () => {
-    renderAs(["users.read"], <UserDetailView id="user-abc-123" />);
+    renderAs(["users.read"], detailView("user-abc-123"));
     expect(screen.queryByRole("button", { name: "Suspend account" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Admin access" })).not.toBeInTheDocument();
   });
 
   it("suspends with a required reason and confirm: true, explaining the sign-out", async () => {
     api.mockResolvedValue({ user: { id: "user-abc-123", suspended: true } });
-    renderAs(["users.read", "users.suspend"], <UserDetailView id="user-abc-123" />);
+    renderAs(["users.read", "users.suspend"], detailView("user-abc-123"));
     fireEvent.click(screen.getByRole("button", { name: "Suspend account" }));
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText(/signs this user out on every device/)).toBeInTheDocument();
@@ -151,18 +156,20 @@ describe("user detail", () => {
     fireEvent.click(confirm);
     await waitFor(() => expect(api).toHaveBeenCalledWith("/admin/users/user-abc-123/suspension", { method: "POST", body: { suspended: true, reason: "Repeated abuse", confirm: true } }));
     expect(await screen.findByText(/signed out everywhere/)).toBeInTheDocument();
+    // the server-rendered parts of the page are refreshed
+    expect(refresh).toHaveBeenCalled();
   });
 
   it("offers Restore for a suspended account and shows the stored reason", () => {
     data["/admin/users/user-abc-123"] = detail({ suspended: true, suspensionReason: "Fraud" });
-    renderAs(["users.read", "users.suspend"], <UserDetailView id="user-abc-123" />);
+    renderAs(["users.read", "users.suspend"], detailView("user-abc-123"));
     expect(screen.getByText(/Fraud/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Restore account" })).toBeInTheDocument();
   });
 
   it("keeps the dialog open and shows the server's refusal message", async () => {
     api.mockRejectedValue(new ApiError(403, "You don't have permission to do that.", {}, "TARGET_TOO_POWERFUL"));
-    renderAs(["users.read", "users.suspend"], <UserDetailView id="user-abc-123" />);
+    renderAs(["users.read", "users.suspend"], detailView("user-abc-123"));
     fireEvent.click(screen.getByRole("button", { name: "Suspend account" }));
     const dialog = screen.getByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText("Reason"), { target: { value: "Because" } });
@@ -173,14 +180,14 @@ describe("user detail", () => {
 
   it("does not offer actions on your own account", () => {
     data["/admin/users/admin-self-1"] = detail({ id: "admin-self-1" });
-    renderAs(ALL, <UserDetailView id="admin-self-1" />);
+    renderAs(ALL, detailView("admin-self-1"));
     expect(screen.getByText(/this is your own account/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Suspend account" })).not.toBeInTheDocument();
   });
 
   it("assigns a role the admin may grant, with reason and confirm: true", async () => {
     api.mockResolvedValue({ user: {} });
-    renderAs(["users.read", "roles.read", "admins.assign", "users.read"], <UserDetailView id="user-abc-123" />);
+    renderAs(["users.read", "roles.read", "admins.assign", "users.read"], detailView("user-abc-123"));
     // the super admin role needs permissions this admin lacks, and "support_agent" only needs users.read
     const select = screen.getByLabelText("Role to give");
     expect(within(select).queryByRole("option", { name: "Super admin" })).not.toBeInTheDocument();
@@ -196,7 +203,7 @@ describe("user detail", () => {
   it("removes admin access with roleId null", async () => {
     data["/admin/users/user-abc-123"] = detail({ role: "ADMIN", adminRole: { id: "r1", key: "support_agent", name: "Support agent" } });
     api.mockResolvedValue({ user: {} });
-    renderAs(ALL, <UserDetailView id="user-abc-123" />);
+    renderAs(ALL, detailView("user-abc-123"));
     fireEvent.click(screen.getByRole("button", { name: "Remove admin access" }));
     const dialog = screen.getByRole("dialog");
     fireEvent.change(within(dialog).getByLabelText("Reason"), { target: { value: "Left the team" } });
@@ -205,14 +212,14 @@ describe("user detail", () => {
   });
 
   it("explains when the role list needs roles.read", () => {
-    renderAs(["users.read", "admins.assign"], <UserDetailView id="user-abc-123" />);
+    renderAs(["users.read", "admins.assign"], detailView("user-abc-123"));
     expect(screen.getByText(/needs the “View admin roles” permission/)).toBeInTheDocument();
     expect(requested).not.toContain("/admin/roles");
   });
 
   it("shows the API error when the role list is refused", () => {
     data["/admin/roles"] = new Error("You don't have permission to do that.");
-    renderAs(ALL, <UserDetailView id="user-abc-123" />);
+    renderAs(ALL, detailView("user-abc-123"));
     expect(screen.getByText("You don't have permission to do that.")).toBeInTheDocument();
   });
 });

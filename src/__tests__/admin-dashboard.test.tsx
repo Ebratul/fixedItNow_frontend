@@ -1,18 +1,16 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-let current: { status: string; data?: unknown; message?: string } = { status: "loading" };
-const reload = vi.fn();
-const seen: string[] = [];
-vi.mock("@/lib/use-api", () => ({
-  useApi: (path: string) => {
-    seen.push(path);
-    return { state: current, reload, refresh: vi.fn(), stale: false };
-  },
-}));
+const replace = vi.fn();
+vi.mock("next/navigation", () => ({ useRouter: () => ({ replace, push: vi.fn(), refresh: vi.fn() }), usePathname: () => "/admin" }));
+const serverAdminApi = vi.fn();
+vi.mock("@/lib/server-admin-api", async (orig) => ({ ...(await orig<typeof import("@/lib/server-admin-api")>()), serverAdminApi: (...a: unknown[]) => serverAdminApi(...a) }));
+vi.mock("server-only", () => ({}));
 
 import { AdminProvider } from "@/components/admin/shell/admin-context";
-import { DashboardView, type Dashboard } from "@/components/admin/dashboard/dashboard-view";
+import { DashboardBody, type Dashboard } from "@/components/admin/dashboard/dashboard-body";
+import { DashboardFrame } from "@/components/admin/dashboard/dashboard-frame";
+import { DashboardSummary } from "@/components/admin/dashboard/dashboard-summary";
 import { BarChart } from "@/components/admin/dashboard/bar-chart";
 import type { Me } from "@/lib/use-api";
 
@@ -27,16 +25,13 @@ const data = (over: Partial<Dashboard> = {}): Dashboard => ({
   trends: { newUsers: days(7), bookings: days(7) },
   finance: null, recentActivity: null, ...over,
 });
-const renderIt = (permissions: string[]) => render(<AdminProvider me={me(permissions)}><DashboardView /></AdminProvider>);
+const renderBody = (d: Dashboard) => render(<DashboardBody d={d} />);
 
-beforeEach(() => { current = { status: "loading" }; seen.length = 0; reload.mockReset(); });
+beforeEach(() => { replace.mockReset(); serverAdminApi.mockReset(); });
 
-describe("admin dashboard", () => {
-  it("shows a loading state, then real numbers and links to the queues", () => {
-    renderIt(["dashboard.view"]);
-    expect(screen.getByLabelText("Loading")).toHaveAttribute("aria-busy", "true");
-    current = { status: "ready", data: data() };
-    renderIt(["dashboard.view"]);
+describe("admin dashboard figures (Server Component body)", () => {
+  it("shows real numbers and links to the queues", () => {
+    renderBody(data());
     const link = screen.getByRole("link", { name: /Worker applications to review/ });
     expect(link).toHaveAttribute("href", "/admin/workers");
     expect(link.closest("div")!.textContent).toContain("4");
@@ -45,44 +40,53 @@ describe("admin dashboard", () => {
   });
 
   it("hides money and activity sections when the API did not send them", () => {
-    current = { status: "ready", data: data() };
-    renderIt(["dashboard.view"]);
+    renderBody(data());
     expect(screen.queryByRole("heading", { name: /Money/ })).toBeNull();
     expect(screen.queryByRole("heading", { name: /Recent admin activity/ })).toBeNull();
   });
 
   it("shows finance and activity when present, using formatted taka", () => {
-    current = { status: "ready", data: data({
+    renderBody(data({
       finance: { collectedBdt: 1500, refundedBdt: 500, netBdt: 1000, payments: 3, series: days(7) },
       recentActivity: [{ id: "x", action: "user.suspend", targetType: "User", at: "2026-11-07T05:00:00Z", by: "Root" }],
-    }) };
-    renderIt(["dashboard.view", "finance.reports", "audit.read"]);
+    }));
     expect(screen.getByRole("heading", { name: /Money, last 7 days/ })).toBeInTheDocument();
     expect(screen.getByText("৳1,500")).toBeInTheDocument();
     expect(screen.getByText("user.suspend")).toBeInTheDocument();
   });
 
-  it("says so when nothing needs attention, and when the role has no queues", () => {
-    current = { status: "ready", data: data({ attention: [{ key: "a", label: "Open disputes", count: 0, href: "/admin/disputes" }] }) };
-    renderIt(["dashboard.view"]);
+  it("says so when nothing needs attention", () => {
+    renderBody(data({ attention: [{ key: "a", label: "Open disputes", count: 0, href: "/admin/disputes" }] }));
     expect(screen.getByText(/Nothing is waiting for a decision/)).toBeInTheDocument();
   });
+});
 
-  it("offers retry on error and refuses to load for a role without dashboard.view", () => {
-    current = { status: "error", message: "Something went wrong on our side. Please try again." };
-    renderIt(["dashboard.view"]);
-    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
-    expect(reload).toHaveBeenCalled();
-    seen.length = 0;
-    renderIt(["users.read"]);
-    expect(screen.getByText("Your role cannot open this page")).toBeInTheDocument();
+describe("DashboardSummary (server read)", () => {
+  it("reads the chosen period with the visitor's session and renders the figures", async () => {
+    serverAdminApi.mockResolvedValue({ ok: true, data: data() });
+    render(await DashboardSummary({ days: 90 }));
+    expect(serverAdminApi).toHaveBeenCalledWith("/admin/dashboard?days=90");
+    expect(screen.getByText("120")).toBeInTheDocument();
   });
 
-  it("changes the period", () => {
-    current = { status: "ready", data: data() };
-    renderIt(["dashboard.view"]);
+  it("explains a refusal, and renders nothing without a session", async () => {
+    serverAdminApi.mockResolvedValue({ ok: false, status: 403 });
+    render(await DashboardSummary({ days: 30 }));
+    expect(screen.getByText("Your role cannot see this information.")).toBeInTheDocument();
+    serverAdminApi.mockResolvedValue({ ok: false, status: 401 });
+    expect(await DashboardSummary({ days: 30 })).toBeNull();
+  });
+});
+
+describe("DashboardFrame (client)", () => {
+  it("changes the period through the URL and refuses a role without dashboard.view", () => {
+    render(<AdminProvider me={me(["dashboard.view"])}><DashboardFrame days={30}><p>figures</p></DashboardFrame></AdminProvider>);
+    expect(screen.getByText("figures")).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Period"), { target: { value: "90" } });
-    expect(seen).toContain("/admin/dashboard?days=90");
+    expect(replace).toHaveBeenCalledWith("/admin?days=90", { scroll: false });
+    render(<AdminProvider me={me(["users.read"])}><DashboardFrame days={30}><p>hidden figures</p></DashboardFrame></AdminProvider>);
+    expect(screen.getByText("Your role cannot open this page")).toBeInTheDocument();
+    expect(screen.queryByText("hidden figures")).toBeNull();
   });
 });
 
