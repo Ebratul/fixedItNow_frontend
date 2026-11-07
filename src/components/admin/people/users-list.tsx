@@ -4,6 +4,7 @@ import { Users } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { AdminPage, ApiView, buildQuery, DataTable, useDebounced, type Column } from "@/components/admin/kit";
+import { VirtualDataTable } from "@/components/admin/kit/virtual-data-table";
 import { Pager } from "@/components/community/community-shell";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -25,6 +26,13 @@ const PAGE_SIZES = [
   { value: "2000", label: "All (1000+)" },
 ] as const;
 const DEFAULT_PAGE_SIZE = "20";
+/**
+ * Result sets longer than this render through VirtualDataTable: only the rows in view plus OVERSCAN on each side.
+ * 20 and 50 per page keep the plain DataTable, unchanged.
+ */
+const VIRTUALIZE_ABOVE = 100;
+const OVERSCAN = 10;
+const rowKey = (u: UserRow) => u.id;
 
 export const VERIFICATION_LABELS: Record<string, string> = {
   NOT_SUBMITTED: "not submitted",
@@ -66,9 +74,9 @@ const columns: Column<UserRow>[] = [
       </span>
     ),
   },
-  { key: "kind", header: "Type", cell: (u) => <UserBadges user={u} /> },
-  { key: "status", header: "Status", cell: (u) => (u.suspended ? <Badge tone="danger">Suspended</Badge> : <Badge tone="success">Active</Badge>) },
-  { key: "joined", header: "Joined", hideBelow: "lg", cell: (u) => formatDate(u.createdAt) },
+  { key: "kind", header: "Type", width: "12rem", cell: (u) => <UserBadges user={u} /> },
+  { key: "status", header: "Status", width: "7rem", cell: (u) => (u.suspended ? <Badge tone="danger">Suspended</Badge> : <Badge tone="success">Active</Badge>) },
+  { key: "joined", header: "Joined", hideBelow: "lg", width: "8rem", cell: (u) => formatDate(u.createdAt) },
 ];
 
 /** Searchable, filterable, paginated list of every account (`GET /admin/users`). */
@@ -108,7 +116,11 @@ export function UsersList() {
                 {data.total} {data.total === 1 ? "user" : "users"}
                 {stale && " (updating…)"}
               </p>
-              <DataTable caption="Users" columns={columns} rows={data.users} rowKey={(u) => u.id} busy={stale} />
+              {data.users.length > VIRTUALIZE_ABOVE ? (
+                <VirtualDataTable caption="Users" columns={columns} rows={data.users} rowKey={rowKey} busy={stale} overscan={OVERSCAN} />
+              ) : (
+                <DataTable caption="Users" columns={columns} rows={data.users} rowKey={rowKey} busy={stale} />
+              )}
               <Pager page={data.page} totalPages={data.totalPages} onPage={setPage} label="Users pages" />
             </section>
           )

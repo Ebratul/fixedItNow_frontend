@@ -26,6 +26,49 @@ Entry template:
 
 ---
 
+## 2026-11-07: Virtualized /admin/users table for long results (optimization)
+
+- **Type:** optimization.
+- **What:** with more than 100 rows (in practice "All (1000+)"), /admin/users renders through the new
+  `VirtualDataTable`. It uses TanStack Virtual (`@tanstack/react-virtual` 3.14.21, pinned), with overscan 10. Only
+  the rows in the scroll area plus 10 on each side are in the DOM, and two spacer rows stand in for the rest.
+  - 20 and 50 per page keep the plain `DataTable`, unchanged.
+  - The table is still a real `<table>`: caption, `scope` headers, the row header cell, `aria-rowcount` and
+    `aria-rowindex`.
+  - Fixed layout with column widths, so the columns do not jump while scrolling. Sticky header row. The scroll
+    area is focusable and keyboard-scrollable.
+  - Below md / lg, the hidden columns are left out of the DOM.
+- **Files:**
+  - `src/components/admin/kit/virtual-data-table.tsx` (new);
+  - `src/components/admin/kit/data-table.tsx` (`renderCells` / `hideCell` shared, output unchanged; `Column.width`);
+  - `src/components/admin/people/users-list.tsx` (`VIRTUALIZE_ABOVE = 100`, `OVERSCAN = 10`, column widths);
+  - `package.json` / `package-lock.json`.
+- **Why:** with "All (1000+)", the plain table renders all 1,507 rows (about 9,000 cells) on every commit, including
+  every keystroke in the search box (B3 in `before/bottlenecks.md`).
+- **Requirement:** SRS 5.3-a (large lists), 5.3-c, Phase 10.
+- **Before** (commit `2f1a46b`: "All (1000+)" without virtualization; :3101 dev, React Profiler,
+  admin@rentnest.com):
+  - Profile file: `docs/performance/<label>/profiler/users-all-before.json`
+  - Commit when switching to "All (1000+)": ___ ms (DataTable ___ ms)
+  - One keystroke in the search box, with All shown: ___ ms
+  - Scrolling: ___
+  - Rows / cells in the DOM: 1,507 rows / ≈ 9,000 cells
+- **After** (this commit, same steps):
+  - Profile file: `docs/performance/<label>/profiler/users-all-after.json`
+  - Commit when switching to "All (1000+)": ___ ms (VirtualDataTable ___ ms)
+  - One keystroke in the search box, with All shown: ___ ms
+  - Scrolling commits: ___ ms each
+  - Rows in the DOM: 19–31 (measured: 19 at the top, 31 in the middle; 10 visible + 2 × 10 overscan)
+  - Bundle: /admin/users First Load JS ___ kB (`bash scripts/perf/bundle-report.sh after-virtual`)
+- **Verified by:**
+  - `tsc`, eslint, and vitest (106/106);
+  - headless Chrome on :3101, 24 checks: desktop 1440, tablet 820 and mobile 390 for 20 / 50 / All; header–body
+    column alignment (0 px difference); sticky header; last row 1,508 reachable; Tab ×40 reaches row 42 with the
+    link visible below the header; End key; a link click from a scrolled row; no console errors;
+  - axe: no violations on the table;
+  - resizing from mobile to desktop brings the hidden columns back.
+  - There is no dark mode in the app (no dark theme in `globals.css`), so it was not tested.
+
 ## 2026-11-07: "All (1000+)" page size on /admin/users (tooling, sets up the next optimization)
 
 - **Type:** tooling. This is a stress setting for measurement, not an optimization; no virtualization yet.

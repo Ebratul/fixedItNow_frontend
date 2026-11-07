@@ -19,6 +19,7 @@
     "dev:perf": "set -a && . ./.env.perf && set +a && NEXT_PUBLIC_SITE_URL=http://localhost:3101 next dev -p 3101"
   },
   "dependencies": {
+    "@tanstack/react-virtual": "3.14.21",
     "better-auth": "^1.7.12",
     "lucide-react": "^1.61.0",
     "next": "16.4.3",
