@@ -26,6 +26,37 @@ Entry template:
 
 ---
 
+## 2026-11-07: lucide-react imports and unused packages checked (measurement; no change needed)
+
+- **Type:** measurement. No code or dependency changed, on purpose; the reasons follow.
+- **lucide-react imports are already per icon:**
+  - All 93 imports are named imports, `import { Search } from "lucide-react"`.
+  - There is no `import * as` and no dynamic icon lookup.
+  - Next 16 applies `optimizePackageImports` to `lucide-react` by default (`next/dist/server/config.js`), so the
+    barrel is rewritten to `dist/esm/icons/<name>.mjs`.
+  - The before graph confirms it: 98 separate icon modules, 30.4 kB in total. Deep-path imports would produce the
+    same output, and that package has no type declarations for them.
+- **The "51.4 kB in chunks" duplication is chunking, not imports:**
+  - `scripts/perf/duplicated_modules.py` (new) shows 25 icons in more than one chunk, adding 21.3 kB raw in total
+    (e.g. `search` in 12 chunks).
+  - Shared UI components are duplicated the same way (`select-input` in 24 chunks, `badge` in 42). Turbopack copies
+    small modules shared by some routes into each route's chunk.
+  - Each route still loads each icon once, so First Load JS per route does not change; only cache reuse across
+    navigations does.
+  - Restructuring chunking is not worth the risk for about 1 kB per navigation.
+- **Unused packages: none.**
+  - Every dependency in `package.json` is imported or required by config:
+    - `babel-plugin-react-compiler` by `reactCompiler: true`;
+    - `@tailwindcss/turbopack` and `tailwindcss` by `next.config.ts` and `globals.css`;
+    - `@testing-library/dom` is the peer dependency of `@testing-library/react`.
+  - The 6 packages `npm ls` calls "extraneous" (`@emnapi/*`, `@img/sharp-wasm32`, `@napi-rs/wasm-runtime`,
+    `@tybys/wasm-util`) are sharp's optional WebAssembly fallback. They are recorded in `package-lock.json`, and
+    `npm prune --dry-run` removes nothing.
+- **Files:** `scripts/perf/duplicated_modules.py` (new).
+- **Requirement:** SRS 5.3-c.
+- **Result:** see the "after" bundle report for the same duplication figures after optimizations 1–8.
+- **Verified by:** `npm ls --depth=0`, `npm prune --dry-run`, `npm explain`, and the analyzer graph.
+
 ## 2026-11-07: Server Components for the dashboard figures and the user detail (optimization)
 
 - **Type:** optimization (Server/Client boundary).
