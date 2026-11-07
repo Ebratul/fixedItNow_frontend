@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Menu, ShieldCheck } from "lucide-react";
@@ -14,7 +15,23 @@ import { ErrorState } from "@/components/ui/error-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMe } from "@/lib/use-api";
 import { AdminProvider, useAdmin } from "./admin-context";
-import { AdminLogin } from "./admin-login";
+
+/** Shown while the shell checks the session, and while the log-in form's chunk loads. */
+function ShellSkeleton() {
+  return (
+    <div className="container-page space-y-4 py-8" aria-busy="true" aria-label="Loading the admin panel">
+      <Skeleton className="h-10 w-1/3" />
+      <Skeleton className="h-48" />
+    </div>
+  );
+}
+
+/**
+ * The admin log-in form is loaded only when a visitor is signed out. It validates with zod (`lib/validation`), so a
+ * static import put the whole of zod (about 100 kB) in the first load of every admin route, for administrators who
+ * are already signed in and never see the form.
+ */
+const AdminLogin = dynamic(() => import("./admin-login").then((m) => m.AdminLogin), { loading: ShellSkeleton });
 
 /** Renders the admin sections the signed-in administrator may open. */
 function NavList({ onNavigate }: { onNavigate?: () => void }) {
@@ -103,14 +120,7 @@ function Frame({ children }: { children: ReactNode }) {
  */
 export function AdminShell({ children }: { children: ReactNode }) {
   const { state, reload } = useMe();
-  if (state.status === "loading") {
-    return (
-      <div className="container-page space-y-4 py-8" aria-busy="true" aria-label="Loading the admin panel">
-        <Skeleton className="h-10 w-1/3" />
-        <Skeleton className="h-48" />
-      </div>
-    );
-  }
+  if (state.status === "loading") return <ShellSkeleton />;
   if (state.status === "unauthenticated") return <AdminLogin onSignedIn={reload} />;
   if (state.status === "error") {
     return <ErrorState action={<Button onClick={reload}>Try again</Button>}>{state.message}</ErrorState>;

@@ -26,6 +26,27 @@ Entry template:
 
 ---
 
+## 2026-11-07: Admin log-in form lazy-loaded, so zod leaves the admin routes (optimization)
+
+- **Type:** optimization (bundle).
+- **What:**
+  - `AdminShell` loads `AdminLogin` with `next/dynamic` and shows the same loading skeleton as the session check.
+  - The form validates with zod (`lib/validation`). Before, its static import put zod into the first load of all
+    22 admin routes, although an administrator who is already signed in never sees the form.
+  - Server-side validation is unchanged.
+- **Files:** `src/components/admin/shell/admin-shell.tsx`.
+- **Why:** B1 in `before/bottlenecks.md`:
+  - zod is 102.8 kB raw / 29.3 kB gzip in the first load of every admin route;
+  - Lighthouse: 24 KiB of it unused.
+- **Requirement:** SRS 5.3-c, Phase 10.
+- **Result:**
+  - Headless check on :3101 (dev):
+    - signed in, visiting /admin, /admin/users and /admin/finance requested **no zod chunk**;
+    - signed out, `/admin` requests the form and zod on demand, and signing in through the lazily loaded form works,
+      with no errors.
+  - First Load JS per admin route: see the "after" bundle report (`after/build-sizes.txt`).
+- **Verified by:** `tsc`, eslint (0 warnings), vitest 432/432, and the headless check above.
+
 ## 2026-11-07: Dashboard charts: hidden table only when open, lazy-loaded chart with an equal-height skeleton (optimization)
 
 - **Type:** optimization.
