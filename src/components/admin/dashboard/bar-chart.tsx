@@ -1,17 +1,25 @@
 "use client";
 
 import { useId, useState } from "react";
+import { formatBdt } from "@/lib/format";
 
 export type Point = { date: string; value: number };
+/** How values are written. A name, not a function, so a Server Component can pass it. */
+export type ChartUnit = "count" | "bdt";
+const FORMAT: Record<ChartUnit, (n: number) => string> = { count: (n) => n.toLocaleString("en-BD"), bdt: formatBdt };
 
 /**
  * One-series daily bar chart as plain SVG. Single series: no legend needed (the title names it).
  * Bars are anchored to the baseline with a 2px gap; hovering a bar shows its value, and a collapsible table
  * gives the same numbers to screen readers and keyboard users (the figure itself is one labelled image).
+ * The table is rendered only while it is open: a closed `<details>` would otherwise still render a row per day on
+ * every update.
  */
-export function BarChart({ title, points, format = (n) => n.toLocaleString("en-BD") }: { title: string; points: Point[]; format?: (n: number) => string }) {
+export function BarChart({ title, points, unit = "count" }: { title: string; points: Point[]; unit?: ChartUnit }) {
   const id = useId();
+  const format = FORMAT[unit];
   const [active, setActive] = useState<number | null>(null);
+  const [tableOpen, setTableOpen] = useState(false);
   const max = Math.max(1, ...points.map((p) => p.value));
   const width = 600;
   const height = 150;
@@ -52,9 +60,9 @@ export function BarChart({ title, points, format = (n) => n.toLocaleString("en-B
         <text x={width} y={height + 14} textAnchor="end" className="fill-ink-subtle text-[10px]">{points.at(-1)?.date}</text>
         <text x={width} y="10" textAnchor="end" className="fill-ink-subtle text-[10px]">max {format(max)}</text>
       </svg>
-      <details className="mt-2 text-xs">
+      <details className="mt-2 text-xs" open={tableOpen} onToggle={(e) => setTableOpen(e.currentTarget.open)}>
         <summary className="cursor-pointer font-semibold text-brand-700">Show as table</summary>
-        <table className="mt-2 w-full text-left">
+        {tableOpen && <table className="mt-2 w-full text-left">
           <caption className="sr-only">{title}</caption>
           <thead><tr><th scope="col" className="py-1">Date</th><th scope="col" className="py-1 text-right">Value</th></tr></thead>
           <tbody>
@@ -62,7 +70,7 @@ export function BarChart({ title, points, format = (n) => n.toLocaleString("en-B
               <tr key={p.date} className="border-t border-line"><th scope="row" className="py-1 font-normal">{p.date}</th><td className="py-1 text-right tabular-nums">{format(p.value)}</td></tr>
             ))}
           </tbody>
-        </table>
+        </table>}
       </details>
     </figure>
   );

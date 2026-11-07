@@ -9,7 +9,8 @@ import { SelectInput } from "@/components/ui/select-input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatBdt, formatDateTime } from "@/lib/format";
 import { useApi } from "@/lib/use-api";
-import { BarChart, type Point } from "./bar-chart";
+import type { Point } from "./bar-chart";
+import { LazyBarChart } from "./lazy-bar-chart";
 
 export type Dashboard = {
   generatedAt: string;
@@ -80,9 +81,9 @@ function Body({ d }: { d: Dashboard }) {
         <h2 id="trends-h" className="text-lg font-bold">Trends</h2>
         <p className="mt-1 text-xs text-ink-subtle">Days are Bangladesh calendar days. Updated {formatDateTime(d.generatedAt)}.</p>
         <div className="mt-3 grid gap-4 lg:grid-cols-2">
-          <BarChart title="New users per day" points={d.trends.newUsers} />
-          <BarChart title="New bookings per day" points={d.trends.bookings} />
-          {d.finance && <BarChart title="Money collected per day (BDT)" points={d.finance.series} format={formatBdt} />}
+          <LazyBarChart title="New users per day" points={d.trends.newUsers} />
+          <LazyBarChart title="New bookings per day" points={d.trends.bookings} />
+          {d.finance && <LazyBarChart title="Money collected per day (BDT)" points={d.finance.series} unit="bdt" />}
         </div>
       </section>
 

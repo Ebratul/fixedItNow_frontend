@@ -94,6 +94,18 @@ describe("BarChart", () => {
     // the same numbers are always reachable as a table
     expect(screen.getByText("Show as table")).toBeInTheDocument();
   });
+  it("renders the table only while it is open, with the unit's formatting", () => {
+    const { container } = render(<BarChart title="Money" unit="bdt" points={[{ date: "2026-11-01", value: 1500 }, { date: "2026-11-02", value: 0 }]} />);
+    expect(container.querySelector("table")).toBeNull();
+    const details = container.querySelector("details")!;
+    details.open = true;
+    fireEvent(details, new Event("toggle"));
+    expect(container.querySelectorAll("tbody tr")).toHaveLength(2);
+    expect(screen.getByRole("rowheader", { name: "2026-11-01" })).toBeInTheDocument();
+    details.open = false;
+    fireEvent(details, new Event("toggle"));
+    expect(container.querySelector("table")).toBeNull();
+  });
   it("handles an empty series", () => {
     render(<BarChart title="Empty" points={[]} />);
     expect(screen.getByText("Total 0")).toBeInTheDocument();

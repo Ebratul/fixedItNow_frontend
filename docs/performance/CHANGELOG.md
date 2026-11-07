@@ -26,6 +26,46 @@ Entry template:
 
 ---
 
+## 2026-11-07: Dashboard charts: hidden table only when open, lazy-loaded chart with an equal-height skeleton (optimization)
+
+- **Type:** optimization.
+- **What:**
+  - `BarChart` renders its "Show as table" table only while the `<details>` is open (`onToggle` → state). Before, a
+    closed chart still rendered one table row per day on every update.
+  - The chart is loaded through `next/dynamic` (`LazyBarChart`) as its own chunk. `next/dynamic` sits in a Client
+    Component module, because Next does not code-split a Client Component that a Server Component imports
+    dynamically.
+  - While the chunk loads, `BarChartSkeleton` has the chart's exact box: 250 px (caption 20 + plot 160 + table
+    line 16 + spacing and padding).
+  - `BarChart` now takes `unit: "count" | "bdt"` instead of a `format` function, so a Server Component can render it.
+- **Files:**
+  - `src/components/admin/dashboard/bar-chart.tsx`;
+  - `src/components/admin/dashboard/lazy-bar-chart.tsx` (new);
+  - `src/components/admin/dashboard/dashboard-view.tsx`;
+  - `src/__tests__/admin-dashboard.test.tsx` (new test: table only while open);
+  - `scripts/perf/profile-select.mjs` (new).
+- **Why:** B6 in `before/bottlenecks.md`. A 90-day period rendered 3 × 90 bars plus 3 × 90 hidden table rows.
+- **Requirement:** SRS 5.3-a (bounded rendering), 5.3-c, Phase 10.
+- **Result:**
+  - Period change, slowest React commit (`node scripts/perf/profile-select.mjs /admin dash-days 7 90 30`, 3 runs,
+    :3101 dev):
+
+    | Period | Before | After |
+    | --- | --- | --- |
+    | 7 days | 6.3–9.3 ms | **3.9–4.1 ms** |
+    | 30 days | 15.0–15.6 ms | **6.9–9.7 ms** |
+    | 90 days | 49.0–52.9 ms | **16.8–18.3 ms** |
+
+  - Skeleton vs chart height, with the chart chunk delayed 2.5 s in headless Chrome: 250 = 250 px at 1440 and 390 px.
+    The swap caused no layout shift. The page's only shift, 0.026 on desktop, comes from the site header nav and is
+    unrelated; the baseline Lighthouse already had CLS 0.02.
+  - The chart is a separate chunk (`src_components_admin_dashboard_bar-chart_tsx_*`).
+  - Bundle sizes come with the "after" bundle report.
+- **Verified by:**
+  - `tsc`, eslint (0 warnings), vitest 432/432;
+  - the headless height and CLS check above;
+  - opening one "Show as table" renders exactly one table.
+
 ## 2026-11-07: Scroll-linked UI of the virtualized lists: rAF throttle, scroll position in a ref (optimization)
 
 - **Type:** optimization.
