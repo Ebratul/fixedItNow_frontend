@@ -26,6 +26,47 @@ Entry template:
 
 ---
 
+## 2026-11-07: Virtualized /admin/audit list; metadata stringified only for open entries (optimization)
+
+- **Type:** optimization.
+- **What:**
+  - Above 100 entries (in practice "All (2000+)"), the audit list renders through TanStack Virtual with overscan 10.
+    Only the entries in the scroll area plus 10 on each side are mounted, between two spacer `<li>`s.
+  - Each entry renders its details (metadata `JSON.stringify(…, null, 2)`, hash) only while it is open. Before,
+    every closed `<details>` carried its stringified metadata.
+  - Which entries are open is kept by id in the list, so an opened entry stays open when it scrolls out and back.
+  - Up to 100 entries still render as the plain list.
+  - The windowing now lives in a shared hook `useVirtualRows`, used by `VirtualDataTable` (users) too.
+- **Files:**
+  - `src/components/admin/kit/use-virtual-rows.ts` (new);
+  - `src/components/admin/kit/virtual-data-table.tsx` (uses the hook; no behaviour change);
+  - `src/components/admin/people/audit-view.tsx` (`AuditList`, `VirtualAuditList`, `Entry` with `open`).
+- **Why:** `before/audit-all.md`. All mounted 2,003 entries / 28,527 DOM nodes, with 457 ms of render after the
+  response and long tasks of 241 + 173 ms.
+- **Requirement:** SRS 5.3-a, 5.3-c, Phase 10.
+- **Result** (same method, `scripts/perf/measure-list.mjs`, median of 3 runs, :3101 dev):
+
+  | | Before | After |
+  | --- | --- | --- |
+  | Render after response | 457 ms | **62 ms** |
+  | Switch to All, total | 517 ms | **125 ms** |
+  | Entries mounted | 2,003 | **20** |
+  | DOM nodes on the page | 28,527 | **667** |
+  | Long tasks on switch | 241 + 173 ms | **none** |
+  | Long tasks while typing | 77 ms | **none** |
+
+- **Verified by:**
+  - `tsc`, eslint (0 warnings), vitest 429/429;
+  - headless Chrome at 1440 and 390 px:
+    - 25 per page stays a plain list;
+    - closed entries render no details;
+    - All is windowed (14–17 mounted);
+    - Enter on a summary opens it;
+    - the last entry (2,003) is reachable;
+    - an opened entry is unmounted far away and is still open after scrolling back;
+    - no page-level horizontal scroll, no console errors;
+  - the users-table check script still passes 24/24.
+
 ## 2026-11-07: "All (2000+)" page size on /admin/audit + baseline measurement (tooling)
 
 - **Type:** tooling and measurement. No optimization.

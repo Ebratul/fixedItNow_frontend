@@ -1,9 +1,9 @@
 "use client";
 
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { cn } from "@/lib/cn";
 import { type Column, hideCell, renderCells } from "./data-table";
+import { useVirtualRows } from "./use-virtual-rows";
 
 /** Tailwind's md / lg breakpoints, the same ones `hideBelow` uses in DataTable. */
 const BREAKPOINTS = { md: "(min-width: 48rem)", lg: "(min-width: 64rem)" } as const;
@@ -59,10 +59,6 @@ export function VirtualDataTable<T>({
   /** First guess of a row's height in px, before it is measured. */
   estimateRowHeight?: number;
 }) {
-  // TanStack Virtual returns a stable instance whose methods give new results on every scroll. The React Compiler
-  // would memoize those calls on the instance's identity and render stale rows, so this component opts out.
-  "use no memo";
-  const scrollRef = useRef<HTMLDivElement>(null);
   const headRef = useRef<HTMLTableSectionElement>(null);
   const [headHeight, setHeadHeight] = useState(0);
   const md = useMedia(BREAKPOINTS.md);
@@ -80,25 +76,16 @@ export function VirtualDataTable<T>({
     return () => observer.disconnect();
   }, []);
 
-  // eslint-disable-next-line react-hooks/incompatible-library -- handled: this component is "use no memo" (above)
-  const virtualizer = useVirtualizer({
+  const { scrollRef, items, before, after, measureElement } = useVirtualRows({
     count: rows.length,
-    getScrollElement: () => scrollRef.current,
-    estimateSize: () => estimateRowHeight,
-    overscan,
-    paddingStart: headHeight,
     // Keeps a row's measured height attached to that row when the result changes.
-    getItemKey: (index) => rowKey(rows[index]!),
+    getKey: (index) => rowKey(rows[index]!),
+    overscan,
+    estimateSize: estimateRowHeight,
+    paddingStart: headHeight,
+    // A new result (another filter or page size) starts at its first row.
+    resetOn: rows,
   });
-
-  // A new result (another filter or page size) starts at its first row.
-  useEffect(() => {
-    scrollRef.current?.scrollTo({ top: 0 });
-  }, [rows]);
-
-  const items = virtualizer.getVirtualItems();
-  const before = items.length > 0 ? items[0]!.start - headHeight : 0;
-  const after = items.length > 0 ? virtualizer.getTotalSize() - items[items.length - 1]!.end : 0;
   const spacer = (height: number) => (
     <tr aria-hidden="true">
       <td colSpan={shown.length} style={{ height, padding: 0 }} />
@@ -140,7 +127,7 @@ export function VirtualDataTable<T>({
         <tbody className="divide-y divide-line">
           {before > 0 && spacer(before)}
           {items.map((item) => (
-            <tr key={item.key} data-index={item.index} ref={virtualizer.measureElement} aria-rowindex={item.index + 2} className="align-top hover:bg-brand-50/40">
+            <tr key={item.key} data-index={item.index} ref={measureElement} aria-rowindex={item.index + 2} className="align-top hover:bg-brand-50/40">
               {renderCells(rows[item.index]!, shown)}
             </tr>
           ))}

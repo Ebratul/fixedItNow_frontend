@@ -2,6 +2,7 @@
 
 import { Check, Copy, Download, FileClock, ShieldCheck } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useVirtualRows } from "@/components/admin/kit/use-virtual-rows";
 import { AdminPage, ApiView, buildQuery, downloadFile, useDebounced } from "@/components/admin/kit";
 import { useAdmin } from "@/components/admin/shell/admin-context";
 import { Pager } from "@/components/community/community-shell";
@@ -105,13 +106,7 @@ export function AuditView() {
           ) : (
             <section aria-label="Results" className="space-y-4">
               <p className="text-sm text-ink-muted" aria-live="polite">{data.total} {data.total === 1 ? "entry" : "entries"}{stale && " (updating…)"}</p>
-              <ul aria-busy={stale || undefined} className={`divide-y divide-line overflow-hidden rounded-card border border-line bg-canvas shadow-card ${stale ? "opacity-60" : ""}`}>
-                {data.entries.map((entry) => (
-                  <li key={entry.id}>
-                    <Entry entry={entry} />
-                  </li>
-                ))}
-              </ul>
+              <AuditList entries={data.entries} stale={stale} />
               <Pager page={data.page} totalPages={data.totalPages} onPage={setPage} label="Audit log pages" />
             </section>
           )
@@ -132,10 +127,81 @@ function ActionFilter({ value, onChange }: { value: string; onChange: (value: st
   return <SelectInput id="audit-action" label="Action" placeholder="All actions" value={value} onChange={(e) => onChange(e.target.value)} options={options} hint={state.status === "error" ? "The action list could not be loaded." : undefined} />;
 }
 
-function Entry({ entry }: { entry: AuditEntry }) {
+/** Lists longer than this are virtualized: only the entries in view plus OVERSCAN on each side are mounted. */
+const VIRTUALIZE_ABOVE = 100;
+const OVERSCAN = 10;
+const listClass = "divide-y divide-line rounded-card border border-line bg-canvas shadow-card";
+
+/**
+ * The result list. Which entries are open is kept here, by id, so an opened entry stays open when it scrolls out
+ * of the virtualized window and back in. Up to VIRTUALIZE_ABOVE entries render as a plain list, as before.
+ */
+function AuditList({ entries, stale }: { entries: AuditEntry[]; stale: boolean }) {
+  const [openIds, setOpenIds] = useState<ReadonlySet<string>>(() => new Set());
+  const toggle = (id: string, open: boolean) =>
+    setOpenIds((prev) => {
+      if (prev.has(id) === open) return prev;
+      const next = new Set(prev);
+      if (open) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+
+  if (entries.length <= VIRTUALIZE_ABOVE) {
+    return (
+      <ul aria-busy={stale || undefined} className={`${listClass} overflow-hidden ${stale ? "opacity-60" : ""}`}>
+        {entries.map((entry) => (
+          <li key={entry.id}>
+            <Entry entry={entry} open={openIds.has(entry.id)} onToggle={toggle} />
+          </li>
+        ))}
+      </ul>
+    );
+  }
+  return <VirtualAuditList entries={entries} stale={stale} openIds={openIds} onToggle={toggle} />;
+}
+
+function VirtualAuditList({ entries, stale, openIds, onToggle }: { entries: AuditEntry[]; stale: boolean; openIds: ReadonlySet<string>; onToggle: (id: string, open: boolean) => void }) {
+  const { scrollRef, items, before, after, measureElement } = useVirtualRows({
+    count: entries.length,
+    getKey: (index) => entries[index]!.id,
+    overscan: OVERSCAN,
+    estimateSize: 68,
+    resetOn: entries,
+  });
+  return (
+    <div
+      ref={scrollRef}
+      role="region"
+      aria-label={`Audit entries, ${entries.length} (scrollable)`}
+      tabIndex={0}
+      aria-busy={stale || undefined}
+      className={`max-h-[70vh] overflow-auto rounded-card ${stale ? "opacity-60" : ""}`}
+    >
+      <ul className={listClass}>
+        {before > 0 && <li aria-hidden="true" style={{ height: before }} />}
+        {items.map((item) => {
+          const entry = entries[item.index]!;
+          return (
+            <li key={item.key} data-index={item.index} ref={measureElement} aria-setsize={entries.length} aria-posinset={item.index + 1}>
+              <Entry entry={entry} open={openIds.has(entry.id)} onToggle={onToggle} />
+            </li>
+          );
+        })}
+        {after > 0 && <li aria-hidden="true" style={{ height: after }} />}
+      </ul>
+    </div>
+  );
+}
+
+/**
+ * One entry. Closed, it is only the summary line. The details, including `JSON.stringify` of the metadata, are
+ * rendered only while the entry is open, so a long list does not stringify thousands of hidden objects.
+ */
+function Entry({ entry, open, onToggle }: { entry: AuditEntry; open: boolean; onToggle: (id: string, open: boolean) => void }) {
   const actor = entry.actor ? (entry.actor.name ?? entry.actor.id) + (entry.actor.removed ? " (account removed)" : "") : "system";
   return (
-    <details className="group px-4 py-3">
+    <details className="group px-4 py-3" open={open} onToggle={(e) => onToggle(entry.id, e.currentTarget.open)}>
       <summary className="flex min-h-11 cursor-pointer flex-wrap items-center gap-x-3 gap-y-1 text-sm">
         <span className="font-mono text-xs text-ink-subtle">#{entry.seq}</span>
         <span className="font-mono font-semibold">{entry.action}</span>
@@ -143,7 +209,7 @@ function Entry({ entry }: { entry: AuditEntry }) {
         <span className="text-ink-muted">by {actor}</span>
         <span className="text-ink-subtle">{formatDateTime(entry.createdAt)}</span>
       </summary>
-      <div className="mt-3 space-y-2 text-sm">
+      {open && <div className="mt-3 space-y-2 text-sm">
         <p className="text-xs font-semibold text-ink-subtle">Details</p>
         {entry.metadata === null || entry.metadata === undefined ? (
           <p className="text-ink-muted">No details were recorded.</p>
@@ -151,7 +217,7 @@ function Entry({ entry }: { entry: AuditEntry }) {
           <pre className="max-h-80 overflow-auto rounded-control bg-surface p-3 font-mono text-xs break-words whitespace-pre-wrap">{JSON.stringify(entry.metadata, null, 2)}</pre>
         )}
         <p className="text-xs text-ink-subtle">Entry hash: <span className="font-mono break-all">{entry.hash}</span></p>
-      </div>
+      </div>}
     </details>
   );
 }

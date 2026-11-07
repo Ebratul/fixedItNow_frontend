@@ -312,7 +312,14 @@ describe("audit log", () => {
   it("lists entries newest first with expandable formatted metadata", () => {
     const { container } = renderAs(ALL, <AuditView />);
     expect(screen.getByText("#41")).toBeInTheDocument();
-    expect(container.querySelectorAll("details")).toHaveLength(2);
+    const entries = container.querySelectorAll("details");
+    expect(entries).toHaveLength(2);
+    // Closed entries render only their summary: no stringified metadata until they are opened.
+    expect(container.querySelector("pre")).toBeNull();
+    for (const details of entries) {
+      details.open = true;
+      fireEvent(details, new Event("toggle"));
+    }
     expect(container.querySelector("pre")?.textContent).toContain('"reason": "Abuse"');
     expect(screen.getByText("No details were recorded.")).toBeInTheDocument();
     expect(screen.getByText("by system")).toBeInTheDocument();
