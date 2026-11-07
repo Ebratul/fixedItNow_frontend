@@ -13,7 +13,10 @@
     "e2e:auth": "node e2e/auth-otp.mjs",
     "e2e:admin": "node e2e/admin.mjs",
     "e2e:workflow": "node e2e/workflow.mjs",
-    "e2e:demo": "node e2e/demo.mjs"
+    "e2e:demo": "node e2e/demo.mjs",
+    "build:perf": "set -a && . ./.env.perf && set +a && next build",
+    "start:perf": "set -a && . ./.env.perf && set +a && next start -p 3100",
+    "dev:perf": "set -a && . ./.env.perf && set +a && NEXT_PUBLIC_SITE_URL=http://localhost:3101 next dev -p 3101"
   },
   "dependencies": {
     "better-auth": "^1.7.12",
