@@ -26,6 +26,25 @@ Entry template:
 
 ---
 
+## 2026-11-07: Finance summary skeleton reserves the report's height (CLS fix)
+
+- **Type:** optimization (layout stability), found by the "after" Lighthouse run.
+- **What:**
+  - The /admin/finance summary's loading placeholder was a 256 px block. The loaded summary is 1,411–1,810 px,
+    depending on the width.
+  - The commission report below it rendered high up and was pushed down when the summary arrived.
+  - The placeholder now has the measured height at each breakpoint (`SummarySkeleton`): 1,810 / 1,688 / 1,602 /
+    1,444 / 1,411 px from mobile to xl.
+- **Files:** `src/components/admin/ops/finance-view.tsx`.
+- **Why:**
+  - Lighthouse Desktop on the optimized build: /admin/finance CLS 0.153 (shift of the commission section 0.125),
+    performance score 94.
+  - The mismatch was already in the code. It showed now because the lighter bundle paints the skeletons earlier.
+- **Requirement:** SRS 5.3-c, Phase 10.
+- **Result** (Lighthouse 13.5.0 Desktop, :3100, signed in): CLS **0.153 → 0.027**, performance **94 → 100**. The
+  0.027 left is the site header nav, the same on every page.
+- **Verified by:** `tsc`, eslint (0 warnings), vitest 436/436, and the Lighthouse run in `after/lighthouse/`.
+
 ## 2026-11-07: lucide-react imports and unused packages checked (measurement; no change needed)
 
 - **Type:** measurement. No code or dependency changed, on purpose; the reasons follow.

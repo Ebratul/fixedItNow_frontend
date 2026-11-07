@@ -62,10 +62,20 @@ export function FinanceView() {
   );
 }
 
+/**
+ * The summary's loading placeholder, as tall as the loaded summary at each breakpoint (measured with the perf data:
+ * 1,810 px at 390 px wide, 1,688 at 640, 1,602 at 768, 1,444 at 1,024 and 1,411 from 1,280). The old 256 px block
+ * let the commission report render high up and then jump down when the summary arrived. Lighthouse Desktop
+ * measured that as CLS 0.125 on /admin/finance.
+ */
+function SummarySkeleton() {
+  return <Skeleton className="h-[1810px] sm:h-[1688px] md:h-[1602px] lg:h-[1444px] xl:h-[1411px]" />;
+}
+
 function SummaryReport({ range }: { range: { from: string; to: string } }) {
   const { state, reload, stale } = useApi<Summary>(`/admin/finance/summary${buildQuery(range)}`);
   return (
-    <ApiView state={state} reload={reload} skeleton={<Skeleton className="h-64" />}>
+    <ApiView state={state} reload={reload} skeleton={<SummarySkeleton />}>
       {(s) => {
         const providerCols: Column<Summary["byProvider"][number]>[] = [
           { key: "p", header: "Provider", cell: (r) => providerLabel(r.provider) },
